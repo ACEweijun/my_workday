@@ -1,0 +1,34 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "My Workday",
+        "description": "Tells you whether today is a workday in mainland China (including official make-up workdays), how many workdays are left this month, the next holiday, and month progress."
+      }
+    },
+    "abort": {
+      "already_configured": "Already configured. Only one instance is allowed."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Settings",
+        "description": "Custom dates: comma separated, e.g. 2026-11-28,2026-11-29. Leave empty to clear.",
+        "data": {
+          "url": "Yearly JSON URL template (must contain {year})",
+          "custom_work": "Force workdays",
+          "custom_rest": "Force days off",
+          "notify_service": "Notify service (e.g. notify.mobile_app_iphone)",
+          "notify_time": "Daily reminder time",
+          "holiday_lead_days": "Remind N days before a holiday (comma separated)",
+          "month_end_left": "Remind when workdays left <= N (0 = off)"
+        }
+      }
+    },
+    "error": {
+      "invalid_dates": "Wrong date format, expected 2026-11-28, comma separated.",
+      "date_conflict": "A day cannot be both workday and day off."
+    }
+  }
+}

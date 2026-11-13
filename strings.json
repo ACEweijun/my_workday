@@ -1,0 +1,34 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "我的工作日",
+        "description": "添加后会每天自动判断是否为工作日，并给出本月剩余工作日、下一个假期和本月进度。\n放假与调休数据来自 holiday-cn，每年国务院公布后自动更新，也可以在侧边栏界面里直接粘贴。"
+      }
+    },
+    "abort": {
+      "already_configured": "已经添加过了，只能有一个实例。"
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "设置",
+        "description": "自定义日期：逗号分隔，例如 2026-11-28,2026-11-29。留空即清空。\n提醒：留空通知服务则不发提醒。",
+        "data": {
+          "url": "年度 JSON 地址（含 {year}）",
+          "custom_work": "我设的上班日",
+          "custom_rest": "我设的休息日",
+          "notify_service": "通知服务（如 notify.mobile_app_iphone）",
+          "notify_time": "每天几点提醒",
+          "holiday_lead_days": "假期提前几天提醒（逗号分隔，留空 = 3,1）",
+          "month_end_left": "月末剩余工作日 ≤ 几天时提醒（0 = 关闭）"
+        }
+      }
+    },
+    "error": {
+      "invalid_dates": "日期格式不对，应为 2026-11-28 这种，逗号分隔。",
+      "date_conflict": "同一天不能既算上班又算休息。"
+    }
+  }
+}

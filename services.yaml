@@ -1,0 +1,94 @@
+set_day:
+  name: 设置某一天
+  description: 把某一天设为“算上班”“算休息”或“恢复按国家安排”。
+  fields:
+    date:
+      name: 日期
+      description: 要修改的日期
+      required: true
+      selector:
+        date:
+    mode:
+      name: 状态
+      description: 算上班 / 算休息 / 恢复按国家安排
+      required: true
+      default: work
+      selector:
+        select:
+          options:
+            - value: work
+              label: 算上班
+            - value: rest
+              label: 算休息
+            - value: auto
+              label: 恢复按国家安排
+
+set_custom:
+  name: 设置自定义日期（整批）
+  description: 整批替换“强制上班 / 强制休息”两份日期清单。留空即清空该项。
+  fields:
+    work:
+      name: 强制上班的日期
+      description: 逗号分隔，例如 2026-11-28,2026-11-29
+      example: "2026-11-28,2026-11-29"
+      selector:
+        text:
+    rest:
+      name: 强制休息的日期
+      description: 逗号分隔，例如 2026-11-27
+      example: "2026-11-27"
+      selector:
+        text:
+
+set_anniversaries:
+  name: 设置自定义纪念日
+  description: "整批替换纪念日清单（每行「名称: 日期」）。日期写 MM-DD 表示每年重复（生日/周年），写 YYYY-MM-DD 表示一次性。留空即清空。"
+  fields:
+    data:
+      name: 纪念日列表
+      description: "每行一个「名称: 日期」，例如 生日: 05-20，或 项目上线: 2026-12-01"
+      required: false
+      selector:
+        text:
+          multiline: true
+
+set_todos:
+  name: 设置待办
+  description: "整批替换待办清单，每行「[x] 2026-11-13 内容」，[x] 表示已完成（可省略）。留空即清空。"
+  fields:
+    data:
+      name: 待办列表
+      description: "每行一个「日期 内容」，例如 2026-11-13 交报告"
+      required: false
+      selector:
+        text:
+          multiline: true
+
+clear_custom:
+  name: 清空自定义日期
+  description: 删除所有人为设置的上班 / 休息日期，全部回到国家法定安排。
+
+set_year_data:
+  name: 粘贴年度放假安排
+  description: 把整年的放假 / 调休安排贴进来（支持 holiday-cn 的 JSON，也支持“日期 + 关键字”的纯文本）。保存后本年以这份为准，不再用网络数据。可省略 / 留空 = 恢复自动获取。
+  fields:
+    year:
+      name: 年份
+      description: 不填就是今年
+      required: false
+      selector:
+        number:
+          min: 2020
+          max: 2100
+          mode: box
+    data:
+      name: 安排内容
+      description: 每行一组日期 + 一个关键字；也可以直接粘 holiday-cn 的 JSON
+      required: false
+      selector:
+        text:
+          multiline: true
+
+refresh_data:
+  name: 立即刷新放假数据
+  description: 马上去 holiday-cn 重新拉取今年的放假安排（会丢掉你手动粘贴的同年数据）。正常情况下不用手动调用，集成每周会自己复查一次。
