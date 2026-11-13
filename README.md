@@ -342,7 +342,7 @@ python -m unittest discover -s tests -v
 
 `tests/` 里用桩模块模拟 HA 接口，不需要装 Home Assistant 就能测核心逻辑：日期校验、跨年数据选择、下一年预取、假期识别、导出排版、仓库文件一致性。
 
-仓库自带 GitHub Actions：每次提交跑单测 + hassfest + HACS 校验。`manifest.json` 的 `documentation` / `issue_tracker` 已指向本仓库，`hacs.json` 已开启 `content_in_root`。打 `vX.Y.Z` 标签后，HACS 下载时会列出版本。
+仓库自带 GitHub Actions：每次提交跑单测 + hassfest + HACS 校验。集成源码位于 `custom_components/my_workday/`，`manifest.json` 已声明 `http` 依赖，`documentation` / `issue_tracker` 指向本仓库。打 `vX.Y.Z` Release 后，HACS 下载时可列出版本。
 
 ## 单页切换容器（可选）
 
