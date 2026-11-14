@@ -147,23 +147,24 @@ class MergedCoordinator(DataUpdateCoordinator):
     async def async_sync_due_todos(self, enabled: bool) -> int:
         if not enabled:
             return 0
-        raw = await self.store.async_load()
-        now = dt_util.now().date()
-        due = mnt.all_due_items(raw["maintenance"].get("projects") or [],
-                                now, self.soon_days)
-        todos = [t for t in raw["workday"].get("todos", [])
-                 if not str(t.get("id", "")).startswith("sync_")]
-        added = 0
-        for item in due:
-            day = min(item["due_date"], now.isoformat()) if item["status"] == "due" \
-                else item["due_date"]
-            todos.append({
-                "id": "sync_" + str(item["slug"]) + "_" + str(item["item_id"]),
-                "date": day,
-                "text": f"[维护] {item['project']} · {item['name']}",
-                "done": False,
-            })
-            added += 1
-        raw["workday"]["todos"] = todos
-        await self.store.async_save(raw)
+        async with self._lock:
+            raw = await self.store.async_load()
+            now = dt_util.now().date()
+            due = mnt.all_due_items(raw["maintenance"].get("projects") or [],
+                                    now, self.soon_days)
+            todos = [t for t in raw["workday"].get("todos", [])
+                     if not str(t.get("id", "")).startswith("sync_")]
+            added = 0
+            for item in due:
+                day = min(item["due_date"], now.isoformat()) if item["status"] == "due" \
+                    else item["due_date"]
+                todos.append({
+                    "id": "sync_" + str(item["slug"]) + "_" + str(item["item_id"]),
+                    "date": day,
+                    "text": f"[维护] {item['project']} · {item['name']}",
+                    "done": False,
+                })
+                added += 1
+            raw["workday"]["todos"] = todos
+            await self.store.async_save(raw)
         return added

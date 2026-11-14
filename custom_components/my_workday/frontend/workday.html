@@ -10,8 +10,6 @@
 <header class="bar">
   <b>我的工作日</b>
   <span class="date" id="dateLabel"></span>
-  <span class="spacer"></span>
-  <a class="link" href="maintenance.html">维护台账<span id="dueBadge" class="badge" hidden></span></a>
 </header>
 <div id="msg" class="msg" hidden></div>
 <main>
@@ -56,7 +54,7 @@
   </section>
 
   <section class="card">
-    <div class="card-head"><h2>维护到期</h2><span class="spacer"></span><a class="link" href="maintenance.html">去处理 →</a></div>
+    <div class="card-head"><h2>维护到期</h2></div>
     <div id="dueList"></div>
   </section>
 </main>
@@ -64,19 +62,29 @@
 <script>
 (function () {
   'use strict';
-  var M = window.MW, $ = M.$, S = null, busy = false, year, month;
+  var M = window.MW, $ = M.$, S = null, busy = false, year, month, retries = 0;
 
+  function retryLoad() {
+    if (retries >= 3) return;
+    retries++;
+    setTimeout(load, 2000);
+  }
   function load() {
     if (busy || !M.isHA()) return Promise.resolve();
     busy = true;
     return M.snapshot().then(function (d) {
       if (!d || !d.workday) throw new Error('快照数据为空');
       S = d;
+      retries = 0;
       var t = M.dateOf(d.today);
       if (year === undefined) { year = t.getFullYear(); month = t.getMonth() + 1; }
+      M.setReady(true);
       render();
-    }).catch(function (e) { M.toast(e.message, true); })
-      .finally(function () { busy = false; });
+    }).catch(function (e) {
+      M.setReady(false);
+      M.toast('加载失败：' + e.message + '，自动重试中', true);
+      retryLoad();
+    }).finally(function () { busy = false; });
   }
   function write(service, data) {
     return M.call(service, data).then(load).catch(function (e) { M.toast(e.message, true); });
@@ -105,9 +113,6 @@
       '<div class="stat"><div class="num blue">' + left + ' / ' + total + '</div><div class="lbl">本月工作日 · 剩余/总数</div></div>' +
       '<div class="stat"><div class="num">' + (w.today_work ? '上班' : '休息') + '</div><div class="lbl">今天 · ' + M.esc(w.today_label || '') + '</div></div>' +
       '<div class="stat">' + third + '</div>';
-    var badge = $('dueBadge');
-    badge.hidden = !S.maintenance.due_total;
-    badge.textContent = S.maintenance.due_total;
     $('sourceLabel').textContent = '放假数据：' +
       ({ network: 'holiday-cn 自动获取', manual: '手工覆盖', fallback: '未获取到，按周末规则降级' }[w.holiday_source] || '未获取到');
   }
@@ -208,9 +213,10 @@
   };
   $('todoText').onkeydown = function (e) {
     if (e.key === 'Escape') { $('todoForm').hidden = true; return; }
-    if (e.key !== 'Enter' || !this.value.trim()) return;
+    var text = $('todoText').value.trim();
+    if (e.key !== 'Enter' || !text) return;
     var next = (S.workday.todos || []).slice();
-    next.push({ id: 't' + Date.now().toString(36), date: $('todoDate').value || S.today, text: this.value.trim(), done: false });
+    next.push({ id: 't' + Date.now().toString(36), date: $('todoDate').value || S.today, text: text, done: false });
     $('todoForm').hidden = true;
     saveTodos(next);
   };

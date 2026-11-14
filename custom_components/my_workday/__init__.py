@@ -89,8 +89,7 @@ async def _async_register_panels(hass: HomeAssistant) -> None:
             [StaticPathConfig(PANEL_URL, str(folder), False)]
         )
     except Exception as err:  # noqa: BLE001
-        _LOGGER.warning("静态目录注册失败：%s", err)
-        return
+        _LOGGER.warning("静态目录注册失败（重载时可能已存在）：%s", err)
     for path, title, icon, page in (
         (DOMAIN, "我的工作日", "mdi:calendar-check", PANEL_WORKDAY),
         (PANEL_MAINTENANCE_PATH, "维护台账", "mdi:wrench-outline", PANEL_MAINTENANCE),

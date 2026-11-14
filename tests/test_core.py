@@ -173,6 +173,38 @@ class TestRepo(unittest.TestCase):
         self.assertIn('subscribe_events', shared)
         self.assertIn('my_workday_updated', shared)
 
+    def test_no_inline_page_links(self):
+        for page in ('workday.html', 'maintenance.html'):
+            html = (PKG / 'frontend' / page).read_text(encoding='utf-8')
+            self.assertNotIn('href="workday.html"', html)
+            self.assertNotIn('href="maintenance.html"', html)
+            self.assertNotIn('dueBadge', html)
+        css = (PKG / 'frontend' / 'shared.css').read_text(encoding='utf-8')
+        self.assertNotIn('.link{', css)
+
+    def test_refresh_guard_present(self):
+        shared = (PKG / 'frontend' / 'shared.js').read_text(encoding='utf-8')
+        for token in ('setReady', 'installGuards', 'beforeunload',
+                      "addEventListener('click', guard, true)"):
+            self.assertIn(token, shared)
+        for page in ('workday.html', 'maintenance.html'):
+            html = (PKG / 'frontend' / page).read_text(encoding='utf-8')
+            self.assertIn('M.setReady(true)', html)
+            self.assertIn('M.setReady(false)', html)
+            self.assertIn('retryLoad()', html)
+
+    def test_project_tab_reset(self):
+        html = (PKG / 'frontend' / 'maintenance.html').read_text(encoding='utf-8')
+        self.assertIn('resetForms()', html)
+        self.assertIn('if (t.dataset.tab === slug) return;', html)
+        self.assertIn('kept.indexOf(i.id)', html)
+        self.assertNotIn('Number(this.value)', html)
+
+    def test_options_flow_constructor(self):
+        src = (PKG / 'config_flow.py').read_text(encoding='utf-8')
+        self.assertIn('return MyWorkdayOptionsFlow()', src)
+        self.assertIn('async_get_entry(self.handler)', src)
+
 
 if __name__ == '__main__':
     unittest.main()

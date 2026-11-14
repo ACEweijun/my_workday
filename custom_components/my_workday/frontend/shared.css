@@ -17,8 +17,6 @@ textarea{min-height:78px;resize:vertical;font-family:ui-monospace,SFMono-Regular
 .bar b{font-size:15px;font-weight:500}
 .bar .spacer{flex:1}
 .bar .date{color:var(--muted);font-size:12px}
-.link{color:var(--accent);text-decoration:none;font-size:13px;white-space:nowrap}
-.link:hover{text-decoration:underline}
 .badge{display:inline-block;min-width:18px;padding:0 5px;border-radius:9px;background:var(--danger-soft);color:var(--danger);font-size:11px;line-height:18px;text-align:center;margin-left:4px}
 .badge[hidden]{display:none}
 main{max-width:920px;margin:0 auto;padding:14px;display:flex;flex-direction:column;gap:14px}

@@ -28,14 +28,15 @@ class MyWorkdayConfigFlow(ConfigFlow, domain=DOMAIN):
     @staticmethod
     @callback
     def async_get_options_flow(entry: ConfigEntry) -> OptionsFlow:
-        return MyWorkdayOptionsFlow(entry)
+        return MyWorkdayOptionsFlow()
 
 
 class MyWorkdayOptionsFlow(OptionsFlow):
     async def async_step_init(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         if user_input is not None:
             return self.async_create_entry(title="", data=user_input)
-        options = self.config_entry.options
+        current = self.hass.config_entries.async_get_entry(self.handler)
+        options = current.options if current else {}
         schema = vol.Schema({
             vol.Optional(CONF_SYNC_DUE_TO_TODOS,
                          default=options.get(CONF_SYNC_DUE_TO_TODOS, False)): cv.boolean,

@@ -2,7 +2,7 @@ window.MW = (function () {
   'use strict';
   var DOMAIN = 'my_workday';
   var EVENT = 'my_workday_updated';
-  var token = null, tokenExp = 0, listeners = [], sock = null, closed = false;
+  var token = null, tokenExp = 0, listeners = [], sock = null, closed = false, ready = false;
 
   function $(id) { return document.getElementById(id); }
   function esc(value) {
@@ -73,7 +73,8 @@ window.MW = (function () {
     listeners.forEach(function (fn) { try { fn(scope); } catch (e) { console.warn(e); } });
   }
   function connect() {
-    if (!isHA()) return;
+    if (!isHA() || closed) return;
+    if (sock && (sock.readyState === 0 || sock.readyState === 1)) return;
     var proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
     try { sock = new WebSocket(proto + '//' + location.host + '/api/websocket'); }
     catch (e) { return; }
@@ -88,7 +89,6 @@ window.MW = (function () {
         });
       } else if (msg.type === 'auth_ok') {
         sock.send(JSON.stringify({ type: 'subscribe_events', id: 1, event_type: EVENT }));
-        toast('');
       } else if (msg.type === 'event') {
         broadcast((msg.event && msg.event.data && msg.event.data.scope) || 'all');
       } else if (msg.type === 'auth_invalid') {
@@ -96,6 +96,7 @@ window.MW = (function () {
       }
     };
     sock.onclose = function () {
+      sock = null;
       if (closed) return;
       setTimeout(function () { connect(); }, 5000);
     };
@@ -107,7 +108,28 @@ window.MW = (function () {
     el.hidden = !text;
     el.className = 'msg' + (isErr ? ' err' : '');
   }
-  function go(page) { location.href = '/my_workday/' + page; }
+  function setReady(value) {
+    ready = !!value;
+    if (ready) toast('');
+  }
+  function guard(e) {
+    if (ready) return;
+    e.preventDefault();
+    e.stopPropagation();
+    toast('数据还在加载，请稍候', true);
+  }
+  function installGuards() {
+    document.addEventListener('click', guard, true);
+    document.addEventListener('change', guard, true);
+    document.addEventListener('keydown', guard, true);
+    window.addEventListener('error', function (e) {
+      toast('页面错误：' + (e.message || '未知错误'), true);
+    });
+    window.addEventListener('beforeunload', function () {
+      closed = true;
+      if (sock) { try { sock.close(); } catch (err) { } }
+    });
+  }
   function today() {
     var d = new Date();
     return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
@@ -117,12 +139,14 @@ window.MW = (function () {
     return Math.round((dateOf(a) - dateOf(b)) / 86400000);
   }
   function start() {
-    if (!isHA()) toast('预览模式 · 部署到 Home Assistant 后从侧边栏打开', true);
+    installGuards();
+    if (!isHA()) { toast('预览模式 · 部署到 Home Assistant 后从侧边栏打开', true); return; }
+    toast('正在加载数据…');
     connect();
   }
   return {
     $: $, esc: esc, call: call, snapshot: snapshot, onUpdate: onUpdate,
-    toast: toast, go: go, today: today, dateOf: dateOf, dayDiff: dayDiff,
-    start: start, broadcast: broadcast, isHA: isHA
+    toast: toast, setReady: setReady, today: today, dateOf: dateOf,
+    dayDiff: dayDiff, start: start, broadcast: broadcast, isHA: isHA
   };
 })();

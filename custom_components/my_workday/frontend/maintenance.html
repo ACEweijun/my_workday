@@ -10,8 +10,6 @@
 <header class="bar">
   <b>维护台账</b>
   <span class="date" id="taskLabel"></span>
-  <span class="spacer"></span>
-  <a class="link" href="workday.html">日期待办 →</a>
 </header>
 <div id="msg" class="msg" hidden></div>
 <main>
@@ -74,20 +72,30 @@
 <script>
 (function () {
   'use strict';
-  var M = window.MW, $ = M.$, S = null, busy = false, slug = null, expanded = {};
+  var M = window.MW, $ = M.$, S = null, busy = false, slug = null, expanded = {}, retries = 0;
 
+  function retryLoad() {
+    if (retries >= 3) return;
+    retries++;
+    setTimeout(load, 2000);
+  }
   function load() {
     if (busy || !M.isHA()) return Promise.resolve();
     busy = true;
     return M.snapshot().then(function (d) {
       if (!d || !d.maintenance) throw new Error('快照数据为空');
       S = d;
+      retries = 0;
       var projects = d.maintenance.projects || [];
       if (!projects.length) { slug = null; }
       else if (!projects.some(function (p) { return p.slug === slug; })) { slug = projects[0].slug; }
+      M.setReady(true);
       render();
-    }).catch(function (e) { M.toast(e.message, true); })
-      .finally(function () { busy = false; });
+    }).catch(function (e) {
+      M.setReady(false);
+      M.toast('加载失败：' + e.message + '，自动重试中', true);
+      retryLoad();
+    }).finally(function () { busy = false; });
   }
   function write(service, data) {
     return M.call(service, data).then(load).catch(function (e) { M.toast(e.message, true); });
@@ -189,15 +197,24 @@
   }
   function renderLogItems() {
     var p = project(); if (!p) { $('logItems').innerHTML = ''; return; }
+    var kept = Array.prototype.slice.call(document.querySelectorAll('[data-logitem]:checked'))
+      .map(function (x) { return x.value; });
     $('logItems').innerHTML = (p.items || []).map(function (i) {
       return '<label style="display:block;font-size:13px"><input type="checkbox" style="width:auto" value="' +
-        M.esc(i.id) + '" data-logitem> ' + M.esc(i.name) + '</label>';
+        M.esc(i.id) + '" data-logitem' + (kept.indexOf(i.id) >= 0 ? ' checked' : '') + '> ' +
+        M.esc(i.name) + '</label>';
     }).join('');
   }
 
+  function resetForms() {
+    $('projForm').hidden = true; $('logForm').hidden = true; $('itemForm').hidden = true;
+    $('itemId').value = ''; $('logNote').value = '';
+    editingSlug = null;
+  }
   $('projTabs').onclick = function (e) {
     var t = e.target.closest('[data-tab]'); if (!t) return;
-    slug = t.dataset.tab; expanded = {}; render();
+    if (t.dataset.tab === slug) return;
+    slug = t.dataset.tab; expanded = {}; resetForms(); render();
   };
   var editingSlug = null;
   $('projAdd').onclick = function () {
@@ -209,6 +226,7 @@
   $('projSave').onclick = function () {
     var name = $('projName').value.trim();
     if (!name) { M.toast('项目名称不能为空', true); return; }
+    if (!editingSlug && !$('projSlug').value.trim()) { M.toast('中文项目名需要填英文标识', true); return; }
     var common = {
       name: name, need_counter: $('projCounter').value === '1',
       counter_unit: $('projUnit').value.trim()
@@ -238,7 +256,7 @@
   };
   $('counterValue').onchange = function () {
     var p = project(); if (!p) return;
-    write('set_counter', { slug: p.slug, value: Number(this.value) });
+    write('set_counter', { slug: p.slug, value: Number($('counterValue').value) });
   };
   $('logOpen').onclick = function () {
     var f = $('logForm'); f.hidden = !f.hidden;

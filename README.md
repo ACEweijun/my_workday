@@ -13,7 +13,7 @@ Home Assistant 自定义集成。**一个集成、一份数据、两个独立网
 | **我的工作日**（主体） | `/my_workday/workday.html` | 月历、调休与补班、待办分组、纪念日、自定义工作日、维护到期提示 |
 | **维护台账** | `/my_workday/maintenance.html` | 多项目、维护小项、周期与计数、记录一次维护、历史、导出 |
 
-两个页面各自独立渲染，**共用同一份 `shared.css` / `shared.js`**（一套配色、一个 620px 断点、一次 token 解析、一条 WebSocket 订阅）。在任一页面写入数据，后端会广播 `my_workday_updated` 事件，**两个页面同时刷新**，不需要手动重载。
+两个页面各自独立渲染，**共用同一份 `shared.css` / `shared.js`**（一套配色、一个 620px 断点、一次 token 解析、一条 WebSocket 订阅）。页面之间**没有互跳按钮**，切换请用侧边栏。在任一页面写入数据，后端会广播 `my_workday_updated` 事件：当前打开的页面实时刷新，切到另一个页面时会重新拉取最新快照。
 
 ## 安装
 
@@ -67,7 +67,7 @@ maintenance: 全部维护项目（小项 + 历史）
 
 - **同一日历**：`calendar.my_workday` 同时输出工作日事件与维护到期事件，HA 原生日历卡片一眼看全。
 - **到期 → 待办**：`sync_maintenance_todos` 把已到期 / 快到期的维护项写成 `[维护]` 前缀待办；在「设置 → 设备与服务 → 我的日程 → 配置」打开「自动把维护到期项写成待办」后，每天 0 点自动同步，重复执行会先清掉旧的同步项。
-- **页间实时**：后端 `hass.bus.async_fire("my_workday_updated", {"scope": ...})`，两个网页通过 `/api/websocket` 订阅同一事件。
+- **页间实时**：后端 `hass.bus.async_fire("my_workday_updated", {"scope": ...})`，网页通过 `/api/websocket` 订阅事件；页面刷新或首次加载时若服务尚未就绪会自动重试 3 次，重试期间控件点击会被拦截并提示「数据还在加载」。
 - **汇总**：`sensor.my_workday_today_tasks` 把两类「今天要做的事」合成一个数。
 
 ## 与旧版差异
