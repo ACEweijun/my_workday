@@ -73,7 +73,7 @@
     if (busy || !M.isHA()) return Promise.resolve();
     busy = true;
     return M.snapshot().then(function (d) {
-      if (!d || !d.workday) throw new Error('快照数据为空');
+      if (!d || !d.workday) throw new Error('快照格式异常：' + JSON.stringify(d).slice(0, 160));
       S = d;
       retries = 0;
       var t = M.dateOf(d.today);

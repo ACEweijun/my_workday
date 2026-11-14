@@ -205,6 +205,17 @@ class TestRepo(unittest.TestCase):
         self.assertIn('return MyWorkdayOptionsFlow()', src)
         self.assertIn('async_get_entry(self.handler)', src)
 
+    def test_frontend_routing_and_ws_snapshot(self):
+        init = (PKG / '__init__.py').read_text(encoding='utf-8')
+        self.assertIn('FrontendFileView', init)
+        self.assertNotIn('StaticPathConfig', init)
+        self.assertIn('my_workday/snapshot', init)
+        shared = (PKG / 'frontend' / 'shared.js').read_text(encoding='utf-8')
+        self.assertIn("type: 'my_workday/snapshot'", shared)
+        self.assertIn('snapshotViaWS', shared)
+        manifest = json.loads((PKG / 'manifest.json').read_text(encoding='utf-8'))
+        self.assertIn('websocket_api', manifest['dependencies'])
+
 
 if __name__ == '__main__':
     unittest.main()

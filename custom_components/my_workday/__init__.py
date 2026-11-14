@@ -6,13 +6,15 @@ import inspect
 import logging
 from pathlib import Path
 
-from homeassistant.components import frontend
-from homeassistant.components.http import StaticPathConfig
+from aiohttp import web
+
+from homeassistant.components import frontend, websocket_api
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant, ServiceCall, SupportsResponse
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.event import async_track_time_change
+from homeassistant.helpers.http import HomeAssistantView
 from homeassistant.util import dt as dt_util
 
 from . import maintenance as mnt
@@ -33,6 +35,30 @@ from .coordinator import MergedCoordinator
 
 _LOGGER = logging.getLogger(__name__)
 PLATFORMS = [Platform.SENSOR, Platform.BINARY_SENSOR, Platform.CALENDAR]
+_FRONTEND_FILES = frozenset({"workday.html", "maintenance.html", "shared.js", "shared.css"})
+
+
+class FrontendFileView(HomeAssistantView):
+    url = PANEL_URL + "/{filename}"
+    name = "api:my_workday:frontend"
+    requires_auth = False
+
+    async def get(self, request, filename):
+        if filename not in _FRONTEND_FILES:
+            raise web.HTTPNotFound()
+        path = Path(__file__).parent / "frontend" / filename
+        if not path.is_file():
+            raise web.HTTPNotFound()
+        return web.FileResponse(path)
+
+
+@websocket_api.websocket_command({"type": "my_workday/snapshot"})
+@websocket_api.async_response
+async def _ws_snapshot(hass: HomeAssistant, connection, msg) -> None:
+    coordinator = _get(hass)
+    if not coordinator.data:
+        await coordinator.async_refresh()
+    connection.send_result(msg["id"], dict(coordinator.data or {}))
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
@@ -52,6 +78,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     )
     entry.async_on_unload(entry.add_update_listener(_options_updated))
     _async_register_services(hass, coordinator)
+    if not hass.data.get(f"{DOMAIN}_ws"):
+        websocket_api.async_register_command(hass, _ws_snapshot)
+        hass.data[f"{DOMAIN}_ws"] = True
     await _async_register_panels(hass)
     return True
 
@@ -83,13 +112,10 @@ def _get(hass: HomeAssistant) -> MergedCoordinator:
 async def _async_register_panels(hass: HomeAssistant) -> None:
     if hass.data.get(f"{DOMAIN}_panels"):
         return
-    folder = Path(__file__).parent / "frontend"
     try:
-        await hass.http.async_register_static_paths(
-            [StaticPathConfig(PANEL_URL, str(folder), False)]
-        )
+        hass.http.register_view(FrontendFileView())
     except Exception as err:  # noqa: BLE001
-        _LOGGER.warning("静态目录注册失败（重载时可能已存在）：%s", err)
+        _LOGGER.warning("前端文件路由注册失败（重载时可能已存在）：%s", err)
     for path, title, icon, page in (
         (DOMAIN, "我的工作日", "mdi:calendar-check", PANEL_WORKDAY),
         (PANEL_MAINTENANCE_PATH, "维护台账", "mdi:wrench-outline", PANEL_MAINTENANCE),
@@ -149,7 +175,12 @@ def _async_register_services(hass: HomeAssistant, coordinator: MergedCoordinator
                                          supports_response=SupportsResponse.OPTIONAL)
 
     async def snapshot(_call: ServiceCall) -> dict:
-        return dict(coordinator.data or {})
+        if not coordinator.data:
+            await coordinator.async_refresh()
+        data = dict(coordinator.data or {})
+        if not data:
+            raise HomeAssistantError("快照为空：协调器尚未产生数据")
+        return data
 
     async def set_day(call: ServiceCall) -> dict:
         day = _iso(call.data.get("date"))

@@ -2,7 +2,7 @@ window.MW = (function () {
   'use strict';
   var DOMAIN = 'my_workday';
   var EVENT = 'my_workday_updated';
-  var token = null, tokenExp = 0, listeners = [], sock = null, closed = false, ready = false;
+  var token = null, tokenExp = 0, listeners = [], sock = null, closed = false, ready = false, pending = {}, seq = 0;
 
   function $(id) { return document.getElementById(id); }
   function esc(value) {
@@ -55,7 +55,7 @@ window.MW = (function () {
       return fetch(location.origin + path, opt);
     }).then(function (r) {
       if (r.status === 401 && !retried) { token = null; tokenExp = 0; return api(path, opt, true); }
-      if (!r.ok) return r.text().then(function (t) { throw new Error('请求失败 ' + r.status + ' ' + t.slice(0, 120)); });
+      if (!r.ok) return r.text().then(function (t) { throw new Error('请求失败 ' + r.status + ' ' + t.slice(0, 200)); });
       return r.text().then(function (t) { return t ? JSON.parse(t) : null; });
     });
   }
@@ -67,7 +67,26 @@ window.MW = (function () {
     return api(path, { method: 'POST', body: JSON.stringify(data || {}) })
       .then(wantResponse ? unwrap : function (x) { return x; });
   }
-  function snapshot() { return call('get_snapshot', {}, true); }
+  function snapshotViaWS() {
+    return new Promise(function (resolve, reject) {
+      if (!sock || sock.readyState !== 1) { reject(new Error('WS 未连接')); return; }
+      var id = 100 + (++seq);
+      var timer = setTimeout(function () {
+        delete pending[id];
+        reject(new Error('WS 快照超时'));
+      }, 3000);
+      pending[id] = function (ok, result) {
+        clearTimeout(timer);
+        if (ok && result && result.workday) resolve(result);
+        else reject(new Error('WS 快照无数据'));
+      };
+      try { sock.send(JSON.stringify({ type: 'my_workday/snapshot', id: id })); }
+      catch (e) { delete pending[id]; clearTimeout(timer); reject(e); }
+    });
+  }
+  function snapshot() {
+    return snapshotViaWS().catch(function () { return call('get_snapshot', {}, true); });
+  }
   function onUpdate(fn) { if (typeof fn === 'function') listeners.push(fn); }
   function broadcast(scope) {
     listeners.forEach(function (fn) { try { fn(scope); } catch (e) { console.warn(e); } });
@@ -89,6 +108,9 @@ window.MW = (function () {
         });
       } else if (msg.type === 'auth_ok') {
         sock.send(JSON.stringify({ type: 'subscribe_events', id: 1, event_type: EVENT }));
+      } else if (msg.type === 'result' && pending[msg.id]) {
+        var cb = pending[msg.id]; delete pending[msg.id];
+        cb(msg.success, msg.result);
       } else if (msg.type === 'event') {
         broadcast((msg.event && msg.event.data && msg.event.data.scope) || 'all');
       } else if (msg.type === 'auth_invalid') {
@@ -97,6 +119,9 @@ window.MW = (function () {
     };
     sock.onclose = function () {
       sock = null;
+      Object.keys(pending).forEach(function (k) {
+        pending[k](false, null); delete pending[k];
+      });
       if (closed) return;
       setTimeout(function () { connect(); }, 5000);
     };
