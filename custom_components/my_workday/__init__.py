@@ -1,380 +1,412 @@
-"""集成入口：装载协调器、注册平台/服务、自带界面、提醒任务。"""
+"""my_workday：工作日 / 待办 / 维护台账合并集成，两个独立网页共用一份数据。"""
 from __future__ import annotations
 
+import datetime as dt
 import inspect
 import logging
-from datetime import date
-from datetime import time as dtime
-from datetime import timedelta
 from pathlib import Path
 
+from homeassistant.components import frontend
+from homeassistant.components.http import StaticPathConfig
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant, ServiceCall, SupportsResponse
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.event import async_track_time_change
-from homeassistant.helpers.update_coordinator import UpdateFailed
 from homeassistant.util import dt as dt_util
 
-from . import core
+from . import maintenance as mnt
+from . import workday as wd
 from .const import (
-    CONF_HOLIDAY_LEAD,
-    CONF_MONTH_END_AT,
-    CONF_NOTIFY_SERVICE,
-    CONF_NOTIFY_TIME,
-    DEFAULT_HOLIDAY_LEAD,
-    DEFAULT_MONTH_END_AT,
-    DEFAULT_NOTIFY_TIME,
-    DOMAIN,
-    MODE_AUTO,
-    MODE_REST,
-    MODE_WORK,
-    PANEL_FILE,
-    PANEL_ICON,
-    PANEL_TITLE,
-    PANEL_URL,
-    SERVICE_CLEAR,
-    SERVICE_REFRESH,
-    SERVICE_SET_ANNIVERSARY,
-    SERVICE_SET_CUSTOM,
-    SERVICE_SET_DAY,
-    SERVICE_SET_TODOS,
-    SERVICE_SET_YEAR,
+    DOMAIN, EVENT_UPDATED, MODE_AUTO, MODE_REST, MODE_WORK,
+    PANEL_MAINTENANCE, PANEL_MAINTENANCE_PATH, PANEL_URL, PANEL_WORKDAY,
+    SCOPE_MAINTENANCE, SCOPE_WORKDAY, SERVICE_ADD_ITEM, SERVICE_ADD_PROJECT,
+    SERVICE_CLEAR_CUSTOM, SERVICE_DELETE_ITEM, SERVICE_DELETE_PROJECT,
+    SERVICE_DELETE_RECORD, SERVICE_EXPORT, SERVICE_GET_SNAPSHOT,
+    SERVICE_LIST_PROJECTS, SERVICE_LOG_SERVICE, SERVICE_REFRESH,
+    SERVICE_SET_ANNIVERSARIES, SERVICE_SET_BASELINE, SERVICE_SET_COUNTER,
+    SERVICE_SET_CUSTOM, SERVICE_SET_DAY, SERVICE_SET_TODOS, SERVICE_SET_YEAR,
+    SERVICE_SYNC_TODOS, SERVICE_UPDATE_ITEM, SERVICE_UPDATE_PROJECT,
+    SERVICE_UPDATE_RECORD, CONF_SYNC_DUE_TO_TODOS,
 )
-from .coordinator import CnWorkdayCoordinator
+from .coordinator import MergedCoordinator
 
 _LOGGER = logging.getLogger(__name__)
-PLATFORMS: list[Platform] = [
-    Platform.SENSOR,
-    Platform.BINARY_SENSOR,
-    Platform.CALENDAR,
-]
+PLATFORMS = [Platform.SENSOR, Platform.BINARY_SENSOR, Platform.CALENDAR]
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    """装载一个配置条目。"""
-    coordinator = CnWorkdayCoordinator(hass, entry)
+    coordinator = MergedCoordinator(hass, entry)
     await coordinator.async_config_entry_first_refresh()
-
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = coordinator
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
-    async def _at_midnight(_now) -> None:
-        """每天 0 点重算，跨天自动翻页。"""
+    async def _midnight(_now) -> None:
         await coordinator.async_refresh()
+        if bool(entry.options.get(CONF_SYNC_DUE_TO_TODOS, False)):
+            await coordinator.async_sync_due_todos(True)
+            await coordinator.async_refresh()
 
     entry.async_on_unload(
-        async_track_time_change(hass, _at_midnight, hour=0, minute=0, second=30)
+        async_track_time_change(hass, _midnight, hour=0, minute=0, second=30)
     )
-    hass.data[f"{DOMAIN}_reminder"] = _async_setup_reminder(hass, entry, coordinator)
-    entry.async_on_unload(entry.add_update_listener(_async_options_updated))
-
-    _async_register_services(hass)
-    await _async_register_panel(hass)
-    _LOGGER.debug("我的工作日已加载")
+    entry.async_on_unload(entry.add_update_listener(_options_updated))
+    _async_register_services(hass, coordinator)
+    await _async_register_panels(hass)
     return True
 
 
+async def _options_updated(hass: HomeAssistant, entry: ConfigEntry) -> None:
+    coordinator = _get(hass)
+    await coordinator.async_force_refresh()
+
+
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    """卸载配置条目。"""
     unloaded = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     if unloaded:
-        reminder = hass.data.pop(f"{DOMAIN}_reminder", None)
-        if reminder:
-            reminder()
-        bucket = hass.data.get(DOMAIN, {})
-        bucket.pop(entry.entry_id, None)
-        if not bucket:
-            for service in (
-                SERVICE_SET_DAY,
-                SERVICE_SET_CUSTOM,
-                SERVICE_CLEAR,
-                SERVICE_SET_YEAR,
-                SERVICE_SET_ANNIVERSARY,
-                SERVICE_SET_TODOS,
-                SERVICE_REFRESH,
-            ):
-                if hass.services.has_service(DOMAIN, service):
-                    hass.services.async_remove(DOMAIN, service)
-            _async_remove_panel(hass)
+        hass.data.get(DOMAIN, {}).pop(entry.entry_id, None)
+        if not hass.data.get(DOMAIN):
+            for name in list(hass.services.async_services().get(DOMAIN, {})):
+                hass.services.async_remove(DOMAIN, name)
+            _async_remove_panels(hass)
     return unloaded
 
 
-async def _async_options_updated(hass: HomeAssistant, entry: ConfigEntry) -> None:
-    """选项改了只重建提醒。数据源地址是每帧从 options 读的，不必重载集成。"""
-    key = f"{DOMAIN}_reminder"
-    previous = hass.data.pop(key, None)
-    if previous:
-        previous()
-    hass.data[key] = _async_setup_reminder(hass, entry, _get_coordinator(hass))
+def _get(hass: HomeAssistant) -> MergedCoordinator:
+    bucket = hass.data.get(DOMAIN) or {}
+    for value in bucket.values():
+        if isinstance(value, MergedCoordinator):
+            return value
+    raise HomeAssistantError("my_workday 尚未加载完成")
 
 
-# ---------------------------------------------------------------- 提醒
-def _parse_clock(raw) -> tuple[int, int]:
-    if isinstance(raw, dtime):
-        return raw.hour, raw.minute
-    parts = str(raw or DEFAULT_NOTIFY_TIME).strip().split(":")
-    try:
-        return int(parts[0]), int(parts[1]) if len(parts) > 1 else 0
-    except (ValueError, IndexError):
-        return 8, 0
-
-
-def _parse_ints(raw) -> set[int]:
-    out: set[int] = set()
-    for chunk in str(raw or "").replace("，", ",").split(","):
-        chunk = chunk.strip()
-        if chunk.isdigit():
-            out.add(int(chunk))
-    return out
-
-
-def _async_setup_reminder(
-    hass: HomeAssistant, entry: ConfigEntry, coordinator: CnWorkdayCoordinator
-):
-    """每天定时推送：假期倒计时 + 月末剩余工作日。没配 notify 服务就不启用。"""
-    service = str(entry.options.get(CONF_NOTIFY_SERVICE) or "").strip()
-    if "." not in service:
-        return lambda: None
-
-    lead_days = _parse_ints(entry.options.get(CONF_HOLIDAY_LEAD) or DEFAULT_HOLIDAY_LEAD)
-    month_end_raw = str(entry.options.get(CONF_MONTH_END_AT) or DEFAULT_MONTH_END_AT)
-    month_end_at = int(month_end_raw) if month_end_raw.strip().isdigit() else 3
-    hour, minute = _parse_clock(entry.options.get(CONF_NOTIFY_TIME))
-    domain, _, name = service.partition(".")
-
-    async def _job(_now) -> None:
-        data = coordinator.data or {}
-        messages: list[str] = []
-
-        holiday = data.get("next_holiday")
-        if holiday and holiday.get("days") in lead_days:
-            messages.append(
-                f"距{holiday['name']}还有 {holiday['days']} 天"
-                f"（{holiday['start']} 起，共 {holiday['total_days']} 天）"
-            )
-
-        left = data.get("left")
-        if month_end_at > 0 and isinstance(left, int) and 0 < left <= month_end_at:
-            today = dt_util.now().date()
-            last_day = (today.replace(day=28) + timedelta(days=4)).replace(day=1) - timedelta(days=1)
-            messages.append(f"本月还剩 {left} 个工作日（含今天），月末 {last_day.day} 号")
-
-        if not messages:
-            return
-        try:
-            await hass.services.async_call(
-                domain,
-                name,
-                {"title": "工作日提醒", "message": "\n".join(messages)},
-                blocking=False,
-            )
-        except Exception as err:  # noqa: BLE001
-            _LOGGER.warning("提醒发送失败：%s", err)
-
-    return async_track_time_change(hass, _job, hour=hour, minute=minute, second=0)
-
-
-# ---------------------------------------------------------------- 自带界面
-async def _async_register_panel(hass: HomeAssistant) -> None:
-    """把 frontend/workday.html 挂到 /my_workday，并加进侧边栏。"""
-    flag = f"{DOMAIN}_panel"
-    if hass.data.get(flag):
+async def _async_register_panels(hass: HomeAssistant) -> None:
+    if hass.data.get(f"{DOMAIN}_panels"):
         return
-
     folder = Path(__file__).parent / "frontend"
-    if not (folder / PANEL_FILE).exists():
-        _LOGGER.warning("找不到界面文件 %s，跳过侧边栏注册", folder / PANEL_FILE)
-        return
-
     try:
-        from homeassistant.components.http import StaticPathConfig
-
         await hass.http.async_register_static_paths(
             [StaticPathConfig(PANEL_URL, str(folder), False)]
         )
-    except ImportError:
-        try:
-            hass.http.register_static_path(PANEL_URL, str(folder), cache_headers=False)
-        except Exception as err:  # noqa: BLE001
-            _LOGGER.warning("静态目录注册失败：%s", err)
-            return
     except Exception as err:  # noqa: BLE001
         _LOGGER.warning("静态目录注册失败：%s", err)
         return
-
-    try:
-        from homeassistant.components import frontend
-
-        _panel_result = frontend.async_register_built_in_panel(
-            hass,
-            component_name="iframe",
-            sidebar_title=PANEL_TITLE,
-            sidebar_icon=PANEL_ICON,
-            frontend_url_path=DOMAIN,
-            config={"url": f"{PANEL_URL}/{PANEL_FILE}"},
-            require_admin=False,
-        )
-        if inspect.isawaitable(_panel_result):
-            await _panel_result
-    except Exception as err:  # noqa: BLE001
-        _LOGGER.warning(
-            "侧边栏面板注册失败（不影响实体）：%s。可改用 Webpage 仪表盘打开 %s/%s",
-            err,
-            PANEL_URL,
-            PANEL_FILE,
-        )
-        return
-
-    hass.data[flag] = True
+    for path, title, icon, page in (
+        (DOMAIN, "我的工作日", "mdi:calendar-check", PANEL_WORKDAY),
+        (PANEL_MAINTENANCE_PATH, "维护台账", "mdi:wrench-outline", PANEL_MAINTENANCE),
+    ):
+        try:
+            result = frontend.async_register_built_in_panel(
+                hass,
+                component_name="iframe",
+                sidebar_title=title,
+                sidebar_icon=icon,
+                frontend_url_path=path,
+                config={"url": f"{PANEL_URL}/{page}"},
+                require_admin=False,
+            )
+            if inspect.isawaitable(result):
+                await result
+        except Exception as err:  # noqa: BLE001
+            _LOGGER.warning("侧边栏面板 %s 注册失败：%s", title, err)
+    hass.data[f"{DOMAIN}_panels"] = True
 
 
-def _async_remove_panel(hass: HomeAssistant) -> None:
-    try:
-        from homeassistant.components import frontend
-
-        frontend.async_remove_panel(hass, DOMAIN)
-    except Exception:  # noqa: BLE001
-        pass
-    hass.data.pop(f"{DOMAIN}_panel", None)
-
-
-# ---------------------------------------------------------------- 服务
-def _get_coordinator(hass: HomeAssistant) -> CnWorkdayCoordinator:
-    bucket = hass.data.get(DOMAIN) or {}
-    for coordinator in bucket.values():
-        if isinstance(coordinator, CnWorkdayCoordinator):
-            return coordinator
-    raise HomeAssistantError("我的工作日还没加载完，请稍后再试")
+def _async_remove_panels(hass: HomeAssistant) -> None:
+    for path in (DOMAIN, PANEL_MAINTENANCE_PATH):
+        try:
+            frontend.async_remove_panel(hass, path)
+        except Exception:  # noqa: BLE001
+            pass
+    hass.data.pop(f"{DOMAIN}_panels", None)
 
 
-def _to_iso(value) -> str:
-    """兼容 date / datetime / 字符串，并校验是真日期。"""
-    raw = value.isoformat() if hasattr(value, "isoformat") else str(value).strip()
-    try:
-        return date.fromisoformat(raw[:10]).isoformat()
-    except ValueError as err:
-        raise HomeAssistantError(f"日期格式不对：{raw}（应为 2026-11-28）") from err
+def _today() -> dt.date:
+    return dt_util.now().date()
 
 
-def _async_register_services(hass: HomeAssistant) -> None:
-    """逐个补齐，避免某次异常后其它服务永久缺注册。"""
+def _project(raw: dict, slug: str) -> dict:
+    for project in raw["maintenance"]["projects"]:
+        if project.get("slug") == slug:
+            return project
+    raise HomeAssistantError(f"找不到维护项目：{slug}")
 
-    async def handle_set_day(call: ServiceCall) -> dict:
-        coordinator = _get_coordinator(hass)
-        day = _to_iso(call.data.get("date"))
+
+def _item(project: dict, item_id: str) -> dict:
+    for item in project["items"]:
+        if item.get("id") == item_id:
+            return item
+    raise HomeAssistantError(f"找不到维护小项：{item_id}")
+
+
+def _iso(value) -> str:
+    return wd.parse_date(value).isoformat()
+
+
+def _async_register_services(hass: HomeAssistant, coordinator: MergedCoordinator) -> None:
+    def register(name, handler):
+        if not hass.services.has_service(DOMAIN, name):
+            hass.services.async_register(DOMAIN, name, handler,
+                                         supports_response=SupportsResponse.OPTIONAL)
+
+    async def snapshot(_call: ServiceCall) -> dict:
+        return dict(coordinator.data or {})
+
+    async def set_day(call: ServiceCall) -> dict:
+        day = _iso(call.data.get("date"))
         mode = str(call.data.get("mode") or MODE_WORK)
 
-        if mode == MODE_WORK:
-            coordinator.custom_rest.discard(day)
-            coordinator.custom_work.add(day)
-        elif mode == MODE_REST:
-            coordinator.custom_work.discard(day)
-            coordinator.custom_rest.add(day)
-        elif mode == MODE_AUTO:
-            coordinator.custom_work.discard(day)
-            coordinator.custom_rest.discard(day)
-        else:
-            raise HomeAssistantError(f"不认识的 mode：{mode}")
+        def mutate(raw):
+            work = set(raw["workday"]["custom_work"])
+            rest = set(raw["workday"]["custom_rest"])
+            work.discard(day)
+            rest.discard(day)
+            if mode == MODE_WORK:
+                work.add(day)
+            elif mode == MODE_REST:
+                rest.add(day)
+            elif mode != MODE_AUTO:
+                raise HomeAssistantError(f"不认识的 mode：{mode}")
+            raw["workday"]["custom_work"] = sorted(work)
+            raw["workday"]["custom_rest"] = sorted(rest)
 
-        await coordinator.async_save_state()
-        await coordinator.async_refresh()
-        data = coordinator.data or {}
-        return {
-            "date": day,
-            "mode": mode,
-            "month_left": data.get("left"),
-            "month_total": data.get("total"),
-        }
+        await coordinator.async_mutate(SCOPE_WORKDAY, mutate)
+        return {"date": day, "mode": mode, "month_left": (coordinator.data or {})["workday"]["stats"]["left"]}
 
-    async def handle_set_custom(call: ServiceCall) -> dict:
-        coordinator = _get_coordinator(hass)
-        try:
-            work = core.normalize_dates(call.data.get("work"))
-            rest = core.normalize_dates(call.data.get("rest"))
-        except ValueError as err:
-            raise HomeAssistantError(str(err)) from err
+    async def set_custom(call: ServiceCall) -> dict:
+        work = wd.normalize_dates(call.data.get("work"))
+        rest = wd.normalize_dates(call.data.get("rest"))
         both = work & rest
         if both:
             raise HomeAssistantError(f"同一天不能既算上班又算休息：{sorted(both)}")
-        await coordinator.async_set_custom(work, rest)
+
+        def mutate(raw):
+            raw["workday"]["custom_work"] = sorted(work)
+            raw["workday"]["custom_rest"] = sorted(rest)
+
+        await coordinator.async_mutate(SCOPE_WORKDAY, mutate)
         return {"work": len(work), "rest": len(rest)}
 
-    async def handle_set_anniversary(call: ServiceCall) -> dict:
-        coordinator = _get_coordinator(hass)
-        text = str(call.data.get("data") or "")
-        try:
-            items = core.parse_anniversaries(text)
-        except ValueError as err:
-            raise HomeAssistantError(str(err)) from err
-        await coordinator.async_set_anniversaries(items)
-        return {"count": len(items)}
+    async def clear_custom(_call: ServiceCall) -> dict:
+        def mutate(raw):
+            raw["workday"]["custom_work"] = []
+            raw["workday"]["custom_rest"] = []
 
-    async def handle_set_todos(call: ServiceCall) -> dict:
-        coordinator = _get_coordinator(hass)
-        text = str(call.data.get("data") or "")
-        try:
-            items = core.parse_todos(text)
-        except ValueError as err:
-            raise HomeAssistantError(str(err)) from err
-        await coordinator.async_set_todos(items)
-        return {"count": len(items)}
-
-    async def handle_clear(call: ServiceCall) -> dict:
-        coordinator = _get_coordinator(hass)
-        await coordinator.async_set_custom(set(), set())
+        await coordinator.async_mutate(SCOPE_WORKDAY, mutate)
         return {"cleared": True}
 
-    async def handle_refresh(call: ServiceCall) -> dict:
-        coordinator = _get_coordinator(hass)
-        try:
-            off_count, makeup_count, cleared = await coordinator.async_force_refresh()
-        except UpdateFailed as err:
-            raise HomeAssistantError(f"刷新失败：{err}") from err
-        _LOGGER.info("已重新拉取放假数据：放假 %s 天，补班 %s 天", off_count, makeup_count)
-        return {
-            "year": dt_util.now().year,
-            "off_days": off_count,
-            "makeup_days": makeup_count,
-            "manual_data_cleared": cleared,
-        }
-
-    async def handle_set_year(call: ServiceCall) -> dict:
-        coordinator = _get_coordinator(hass)
-        year_raw = call.data.get("year")
-        year = int(year_raw) if year_raw not in (None, "") else dt_util.now().year
+    async def set_year(call: ServiceCall) -> dict:
+        year = int(call.data.get("year") or _today().year)
         text = str(call.data.get("data") or "")
-        if not text.strip():
-            coordinator.year_override.pop(year, None)
-            await coordinator.async_save_state()
-            await coordinator.async_refresh()
-            _LOGGER.info("%s 年已恢复为自动获取", year)
-            return {"year": year, "cleared": True}
-        try:
-            off_count, makeup_count, assumed = await coordinator.async_set_year_data(year, text)
-        except ValueError as err:
-            raise HomeAssistantError(str(err)) from err
-        _LOGGER.info("%s 年安排已更新：放假 %s 天，补班 %s 天", year, off_count, makeup_count)
-        if assumed:
-            _LOGGER.warning(
-                "%s 年第 %s 行没写「休/假/班」，已按放假处理，请核对", year, assumed
-            )
-        return {
-            "year": year,
-            "off_days": off_count,
-            "makeup_days": makeup_count,
-            "assumed_lines": assumed,
-        }
 
-    reg = hass.services.async_register
-    for name, handler in (
-        (SERVICE_SET_DAY, handle_set_day),
-        (SERVICE_SET_CUSTOM, handle_set_custom),
-        (SERVICE_CLEAR, handle_clear),
-        (SERVICE_SET_YEAR, handle_set_year),
-        (SERVICE_SET_ANNIVERSARY, handle_set_anniversary),
-        (SERVICE_SET_TODOS, handle_set_todos),
-        (SERVICE_REFRESH, handle_refresh),
-    ):
-        if not hass.services.has_service(DOMAIN, name):
-            reg(DOMAIN, name, handler, supports_response=SupportsResponse.OPTIONAL)
+        def mutate(raw):
+            overrides = raw["workday"]["year_override"]
+            if text.strip():
+                overrides[str(year)] = text
+            else:
+                overrides.pop(str(year), None)
+
+        await coordinator.async_mutate(SCOPE_WORKDAY, mutate)
+        await coordinator.async_force_refresh()
+        return {"year": year, "set": bool(text.strip())}
+
+    async def set_todos(call: ServiceCall) -> dict:
+        supplied = call.data.get("todos")
+        items = supplied if isinstance(supplied, list) else wd.parse_todos(call.data.get("data"))
+
+        def mutate(raw):
+            raw["workday"]["todos"] = items
+
+        await coordinator.async_mutate(SCOPE_WORKDAY, mutate)
+        return {"count": len(items)}
+
+    async def set_anniversaries(call: ServiceCall) -> dict:
+        supplied = call.data.get("anniversaries")
+        items = supplied if isinstance(supplied, list) else wd.parse_anniversaries(call.data.get("data"))
+
+        def mutate(raw):
+            raw["workday"]["anniversaries"] = items
+
+        await coordinator.async_mutate(SCOPE_WORKDAY, mutate)
+        return {"count": len(items)}
+
+    async def refresh(_call: ServiceCall) -> dict:
+        return await coordinator.async_force_refresh()
+
+    async def add_project(call: ServiceCall) -> dict:
+        name = str(call.data.get("name") or "").strip()
+        slug = str(call.data.get("slug") or mnt.slugify(name)).strip()
+        if not name or not slug:
+            raise HomeAssistantError("中文项目名必须提供英文标识 slug")
+        kind = str(call.data.get("type") or "custom")
+
+        def mutate(raw):
+            projects = raw["maintenance"]["projects"]
+            if any(p.get("slug") == slug for p in projects):
+                raise HomeAssistantError(f"项目标识已存在：{slug}")
+            projects.append(mnt.make_project(
+                slug, name, kind, bool(call.data.get("need_counter")),
+                str(call.data.get("counter_unit") or ""),
+                str(call.data.get("counter_label") or ""),
+                call.data.get("counter"), _today()))
+
+        await coordinator.async_mutate(SCOPE_MAINTENANCE, mutate)
+        return {"slug": slug, "name": name}
+
+    async def update_project(call: ServiceCall) -> dict:
+        slug = str(call.data.get("slug") or "")
+
+        def mutate(raw):
+            project = _project(raw, slug)
+            for key in ("name", "need_counter", "counter_unit", "counter_label"):
+                if key in call.data:
+                    project[key] = call.data[key]
+
+        await coordinator.async_mutate(SCOPE_MAINTENANCE, mutate)
+        return {"slug": slug}
+
+    async def delete_project(call: ServiceCall) -> dict:
+        slug = str(call.data.get("slug") or "")
+
+        def mutate(raw):
+            projects = raw["maintenance"]["projects"]
+            _project(raw, slug)
+            raw["maintenance"]["projects"] = [p for p in projects if p.get("slug") != slug]
+
+        await coordinator.async_mutate(SCOPE_MAINTENANCE, mutate)
+        return {"deleted": slug}
+
+    async def list_projects(_call: ServiceCall) -> dict:
+        return {"projects": (coordinator.data or {})["maintenance"]["summaries"]}
+
+    async def set_counter(call: ServiceCall) -> dict:
+        slug, value = str(call.data.get("slug") or ""), int(call.data.get("value") or 0)
+
+        def mutate(raw):
+            _project(raw, slug)["counter"] = value
+
+        await coordinator.async_mutate(SCOPE_MAINTENANCE, mutate)
+        return {"slug": slug, "value": value}
+
+    async def add_item(call: ServiceCall) -> dict:
+        slug = str(call.data.get("slug") or "")
+
+        def mutate(raw):
+            project = _project(raw, slug)
+            item = {
+                "id": mnt._uid("i", slug, call.data.get("name"), _today().isoformat()),
+                "name": str(call.data.get("name") or "新小项"),
+                "interval_days": int(call.data.get("interval_days") or 180),
+                "interval_counter": call.data.get("interval_counter"),
+                "last_date": None, "last_counter": None,
+                "note": str(call.data.get("note") or ""),
+            }
+            project["items"].append(item)
+            return item["id"]
+
+        item_id = await coordinator.async_mutate(SCOPE_MAINTENANCE, mutate)
+        return {"slug": slug, "item_id": item_id}
+
+    async def update_item(call: ServiceCall) -> dict:
+        slug, item_id = str(call.data.get("slug") or ""), str(call.data.get("item_id") or "")
+
+        def mutate(raw):
+            item = _item(_project(raw, slug), item_id)
+            for key in ("name", "interval_days", "interval_counter", "note"):
+                if key in call.data:
+                    item[key] = call.data[key]
+
+        await coordinator.async_mutate(SCOPE_MAINTENANCE, mutate)
+        return {"slug": slug, "item_id": item_id}
+
+    async def delete_item(call: ServiceCall) -> dict:
+        slug, item_id = str(call.data.get("slug") or ""), str(call.data.get("item_id") or "")
+
+        def mutate(raw):
+            project = _project(raw, slug)
+            _item(project, item_id)
+            project["items"] = [i for i in project["items"] if i.get("id") != item_id]
+
+        await coordinator.async_mutate(SCOPE_MAINTENANCE, mutate)
+        return {"deleted": item_id}
+
+    async def set_baseline(call: ServiceCall) -> dict:
+        slug, item_id = str(call.data.get("slug") or ""), str(call.data.get("item_id") or "")
+
+        def mutate(raw):
+            item = _item(_project(raw, slug), item_id)
+            if call.data.get("last_date") is not None:
+                item["last_date"] = _iso(call.data.get("last_date"))
+            if call.data.get("last_counter") is not None:
+                item["last_counter"] = int(call.data["last_counter"])
+
+        await coordinator.async_mutate(SCOPE_MAINTENANCE, mutate)
+        return {"slug": slug, "item_id": item_id}
+
+    async def log_service(call: ServiceCall) -> dict:
+        slug = str(call.data.get("slug") or "")
+        item_ids = call.data.get("item_ids") or []
+        if isinstance(item_ids, str):
+            item_ids = [x.strip() for x in item_ids.split(",") if x.strip()]
+        date = _iso(call.data.get("date") or _today())
+        notes = call.data.get("item_notes") or {}
+        if call.data.get("note"):
+            notes = {i: call.data["note"] for i in item_ids}
+
+        def mutate(raw):
+            return mnt.log_service(_project(raw, slug), list(item_ids), date,
+                                   call.data.get("counter"), notes, _today())
+
+        record_id = await coordinator.async_mutate(SCOPE_MAINTENANCE, mutate)
+        return {"slug": slug, "record_id": record_id}
+
+    async def update_record(call: ServiceCall) -> dict:
+        slug = str(call.data.get("slug") or "")
+
+        def mutate(raw):
+            mnt.update_record_entry(
+                _project(raw, slug), str(call.data.get("record_id") or ""),
+                str(call.data.get("item_id") or ""), call.data.get("date"),
+                call.data.get("counter"), call.data.get("note"))
+
+        await coordinator.async_mutate(SCOPE_MAINTENANCE, mutate)
+        return {"slug": slug}
+
+    async def delete_record(call: ServiceCall) -> dict:
+        slug = str(call.data.get("slug") or "")
+
+        def mutate(raw):
+            mnt.delete_record_entry(
+                _project(raw, slug), str(call.data.get("record_id") or ""),
+                str(call.data.get("item_id") or ""))
+
+        await coordinator.async_mutate(SCOPE_MAINTENANCE, mutate)
+        return {"slug": slug}
+
+    async def export(call: ServiceCall) -> dict:
+        slug = str(call.data.get("slug") or "")
+        raw = await coordinator.store.async_load()
+        project = _project(raw, slug)
+        return {"markdown": mnt.export_markdown(project, _today(), coordinator.soon_days)}
+
+    async def sync_todos(_call: ServiceCall) -> dict:
+        added = await coordinator.async_sync_due_todos(True)
+        await coordinator.async_refresh()
+        hass.bus.async_fire(EVENT_UPDATED, {"scope": SCOPE_WORKDAY})
+        return {"added": added}
+
+    handlers = (
+        (SERVICE_GET_SNAPSHOT, snapshot), (SERVICE_SET_DAY, set_day),
+        (SERVICE_SET_CUSTOM, set_custom), (SERVICE_CLEAR_CUSTOM, clear_custom),
+        (SERVICE_REFRESH, refresh), (SERVICE_SET_YEAR, set_year),
+        (SERVICE_SET_TODOS, set_todos), (SERVICE_SET_ANNIVERSARIES, set_anniversaries),
+        (SERVICE_ADD_PROJECT, add_project), (SERVICE_UPDATE_PROJECT, update_project),
+        (SERVICE_DELETE_PROJECT, delete_project), (SERVICE_LIST_PROJECTS, list_projects),
+        (SERVICE_SET_COUNTER, set_counter), (SERVICE_ADD_ITEM, add_item),
+        (SERVICE_UPDATE_ITEM, update_item), (SERVICE_DELETE_ITEM, delete_item),
+        (SERVICE_SET_BASELINE, set_baseline), (SERVICE_LOG_SERVICE, log_service),
+        (SERVICE_UPDATE_RECORD, update_record), (SERVICE_DELETE_RECORD, delete_record),
+        (SERVICE_EXPORT, export), (SERVICE_SYNC_TODOS, sync_todos),
+    )
+    for name, handler in handlers:
+        register(name, handler)

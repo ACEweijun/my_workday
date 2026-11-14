@@ -1,60 +1,88 @@
-"""常量定义。"""
+"""my_workday 合并版常量：工作日、待办、维护台账共用一个集成。"""
 from __future__ import annotations
 
 DOMAIN = "my_workday"
-NAME = "我的工作日"
-
-# 数据源。{year} 会被替换成四位年份。
-# 备用地址（jsDelivr 不通时在“配置 → 选项”里换成这个）：
-#   https://raw.githubusercontent.com/NateScarlet/holiday-cn/master/{year}.json
-DEFAULT_URL = "https://cdn.jsdelivr.net/gh/NateScarlet/holiday-cn@master/{year}.json"
-
-CONF_URL = "url"
-CONF_NOTIFY_SERVICE = "notify_service"
-CONF_NOTIFY_TIME = "notify_time"
-CONF_HOLIDAY_LEAD = "holiday_lead_days"
-CONF_MONTH_END_AT = "month_end_left"
-CONF_CUSTOM_WORK = "custom_work"
-CONF_CUSTOM_REST = "custom_rest"
-
-DEFAULT_NOTIFY_TIME = "08:00:00"
-DEFAULT_HOLIDAY_LEAD = "3,1"
-DEFAULT_MONTH_END_AT = "3"
-
+NAME = "我的日程"
+STORAGE_KEY = "my_workday.merged"
 STORAGE_VERSION = 1
-STORAGE_KEY = "my_workday.custom"
 
-# 自定义日期的三种状态
+PANEL_URL = "/my_workday"
+PANEL_WORKDAY = "workday.html"
+PANEL_MAINTENANCE = "maintenance.html"
+PANEL_MAINTENANCE_PATH = "my_workday_maintenance"
+EVENT_UPDATED = "my_workday_updated"
+
+DEFAULT_HOLIDAY_URL = "https://cdn.jsdelivr.net/gh/NateScarlet/holiday-cn@master/{year}.json"
+CONF_HOLIDAY_URL = "holiday_url"
+CONF_SYNC_DUE_TO_TODOS = "sync_due_to_todos"
+CONF_NOTIFY_SERVICE = "notify_service"
+CONF_SOON_DAYS = "soon_days"
+DEFAULT_SOON_DAYS = 7
+KEEP_DAYS = 500
+
 MODE_WORK = "work"
 MODE_REST = "rest"
 MODE_AUTO = "auto"
 
-# 实体 ID（固定英文，避免中文名生成不可预期的 ID）
-ENTITY_LEFT = "sensor.my_workday_left"
-ENTITY_TOTAL = "sensor.my_workday_total"
+STATUS_DUE = "due"
+STATUS_SOON = "soon"
+STATUS_OK = "ok"
+STATUS_UNSET = "unset"
+
+SCOPE_WORKDAY = "workday"
+SCOPE_MAINTENANCE = "maintenance"
+SCOPE_ALL = "all"
+
 ENTITY_TODAY = "binary_sensor.my_workday_today"
 ENTITY_TOMORROW = "binary_sensor.my_workday_tomorrow"
-ENTITY_NEXT_HOLIDAY = "sensor.my_workday_next_holiday"
+ENTITY_LEFT = "sensor.my_workday_left"
+ENTITY_TOTAL = "sensor.my_workday_total"
 ENTITY_PROGRESS = "sensor.my_workday_month_progress"
+ENTITY_NEXT_HOLIDAY = "sensor.my_workday_next_holiday"
+ENTITY_DUE_MAINTENANCE = "sensor.my_workday_due_maintenance"
+ENTITY_TODAY_TASKS = "sensor.my_workday_today_tasks"
 ENTITY_CALENDAR = "calendar.my_workday"
 
-# 服务
-SERVICE_SET_CUSTOM = "set_custom"
+SERVICE_GET_SNAPSHOT = "get_snapshot"
 SERVICE_SET_DAY = "set_day"
-SERVICE_CLEAR = "clear_custom"
-SERVICE_SET_YEAR = "set_year_data"
-SERVICE_SET_ANNIVERSARY = "set_anniversaries"
-SERVICE_SET_TODOS = "set_todos"
+SERVICE_SET_CUSTOM = "set_custom"
+SERVICE_CLEAR_CUSTOM = "clear_custom"
 SERVICE_REFRESH = "refresh_data"
+SERVICE_SET_YEAR = "set_year_data"
+SERVICE_SET_TODOS = "set_todos"
+SERVICE_SET_ANNIVERSARIES = "set_anniversaries"
+SERVICE_ADD_PROJECT = "add_project"
+SERVICE_UPDATE_PROJECT = "update_project"
+SERVICE_DELETE_PROJECT = "delete_project"
+SERVICE_LIST_PROJECTS = "list_projects"
+SERVICE_SET_COUNTER = "set_counter"
+SERVICE_ADD_ITEM = "add_item"
+SERVICE_UPDATE_ITEM = "update_item"
+SERVICE_DELETE_ITEM = "delete_item"
+SERVICE_SET_BASELINE = "set_baseline"
+SERVICE_LOG_SERVICE = "log_service"
+SERVICE_UPDATE_RECORD = "update_record"
+SERVICE_DELETE_RECORD = "delete_record"
+SERVICE_EXPORT = "export_markdown"
+SERVICE_SYNC_TODOS = "sync_maintenance_todos"
 
-# 当年数据多久复查一次（天）。上游年中若有修订也能跟上
-REFRESH_DAYS = 7
-
-# 自定义日期保留多久（天），避免无限增长
-KEEP_DAYS = 500
-
-# 集成自带的日历界面
-PANEL_URL = "/my_workday"
-PANEL_FILE = "workday.html"
-PANEL_TITLE = "我的工作日"
-PANEL_ICON = "mdi:calendar-check"
+PRESETS = {
+    "vehicle": ("车辆", True, "公里", "里程", [
+        ("机油 + 机油滤芯", 180, 10000), ("空调滤芯", 365, 20000),
+        ("空气滤芯", 365, 20000), ("轮胎换位", 365, 20000),
+        ("刹车油", 730, None), ("冷却液", 730, None),
+    ]),
+    "appliance": ("家电", False, "", "", [
+        ("清洗筒内 / 过滤器", 90, None), ("清理排水口 / 滤网", 90, None),
+        ("检查密封圈与水管", 180, None), ("机身内外擦拭", 30, None),
+    ]),
+    "furniture": ("家具", False, "", "", [
+        ("清洗坐垫与靠背", 180, None), ("检查气压杆升降", 365, None),
+        ("紧固螺丝与检查脚轮", 365, None), ("扶手与头枕除尘", 30, None),
+    ]),
+    "area": ("区域", False, "", "", [
+        ("刷洗马桶", 7, None), ("擦洗玻璃与镜面", 30, None),
+        ("清理地漏与下水口", 30, None), ("除霉与通风", 30, None),
+    ]),
+    "custom": ("自己建", False, "", "", [("例行检查", 180, None)]),
+}

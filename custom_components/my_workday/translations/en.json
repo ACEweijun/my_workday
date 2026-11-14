@@ -1,34 +1,384 @@
 {
+  "title": "My Schedule",
   "config": {
     "step": {
       "user": {
-        "title": "My Workday",
-        "description": "Tells you whether today is a workday in mainland China (including official make-up workdays), how many workdays are left this month, the next holiday, and month progress."
+        "title": "添加我的日程",
+        "description": "装好后侧边栏会出现「我的工作日」和「维护台账」两个页面。"
       }
     },
     "abort": {
-      "already_configured": "Already configured. Only one instance is allowed."
+      "single_instance_allowed": "只能添加一个我的日程实例。"
     }
   },
   "options": {
     "step": {
       "init": {
-        "title": "Settings",
-        "description": "Custom dates: comma separated, e.g. 2026-11-28,2026-11-29. Leave empty to clear.",
+        "title": "选项",
         "data": {
-          "url": "Yearly JSON URL template (must contain {year})",
-          "custom_work": "Force workdays",
-          "custom_rest": "Force days off",
-          "notify_service": "Notify service (e.g. notify.mobile_app_iphone)",
-          "notify_time": "Daily reminder time",
-          "holiday_lead_days": "Remind N days before a holiday (comma separated)",
-          "month_end_left": "Remind when workdays left <= N (0 = off)"
+          "sync_due_to_todos": "自动把维护到期项写成待办",
+          "soon_days": "提前几天算快到期",
+          "holiday_url": "放假数据地址模板",
+          "notify_service": "通知服务"
+        },
+        "data_description": {
+          "holiday_url": "保留 {year} 占位符",
+          "notify_service": "例如 notify.mobile_app_iphone，留空不发"
+        }
+      }
+    }
+  },
+  "services": {
+    "get_snapshot": {
+      "name": "读取全部数据",
+      "description": "一次返回工作日、待办、维护项目的完整快照，供两个网页使用。",
+      "fields": {}
+    },
+    "set_day": {
+      "name": "改某一天",
+      "description": "把某一天设为上班、休息，或恢复按国家安排。",
+      "fields": {
+        "date": {
+          "name": "date",
+          "description": "日期，如 2026-11-28"
+        },
+        "mode": {
+          "name": "mode",
+          "description": "work / rest / auto"
         }
       }
     },
-    "error": {
-      "invalid_dates": "Wrong date format, expected 2026-11-28, comma separated.",
-      "date_conflict": "A day cannot be both workday and day off."
+    "set_custom": {
+      "name": "批量设置工作日",
+      "description": "一次替换自定义上班日与休息日清单。",
+      "fields": {
+        "work": {
+          "name": "work",
+          "description": "逗号分隔的上班日"
+        },
+        "rest": {
+          "name": "rest",
+          "description": "逗号分隔的休息日"
+        }
+      }
+    },
+    "clear_custom": {
+      "name": "清空自定义",
+      "description": "清空全部自定义上班日与休息日。",
+      "fields": {}
+    },
+    "refresh_data": {
+      "name": "刷新放假数据",
+      "description": "清掉缓存并重新拉取当年与次年放假安排。",
+      "fields": {}
+    },
+    "set_year_data": {
+      "name": "手工覆盖整年",
+      "description": "用文本覆盖某一年的放假与补班安排，留空恢复自动获取。",
+      "fields": {
+        "year": {
+          "name": "year",
+          "description": "年份"
+        },
+        "data": {
+          "name": "data",
+          "description": "年度安排文本"
+        }
+      }
+    },
+    "set_todos": {
+      "name": "设置待办",
+      "description": "整批替换待办清单，每行「[x] 日期 内容」。",
+      "fields": {
+        "data": {
+          "name": "data",
+          "description": "待办文本"
+        }
+      }
+    },
+    "set_anniversaries": {
+      "name": "设置纪念日",
+      "description": "整批替换纪念日，每行「名称: 日期」。",
+      "fields": {
+        "data": {
+          "name": "data",
+          "description": "纪念日文本"
+        }
+      }
+    },
+    "add_project": {
+      "name": "新建维护项目",
+      "description": "创建一个维护项目，中文名需要同时提供英文标识。",
+      "fields": {
+        "name": {
+          "name": "name",
+          "description": "项目名称"
+        },
+        "slug": {
+          "name": "slug",
+          "description": "英文标识"
+        },
+        "type": {
+          "name": "type",
+          "description": "预置类型"
+        },
+        "need_counter": {
+          "name": "need_counter",
+          "description": "是否计数"
+        },
+        "counter_unit": {
+          "name": "counter_unit",
+          "description": "计数单位"
+        },
+        "counter_label": {
+          "name": "counter_label",
+          "description": "计数显示名"
+        },
+        "counter": {
+          "name": "counter",
+          "description": "当前计数"
+        }
+      }
+    },
+    "update_project": {
+      "name": "修改维护项目",
+      "description": "改名称、计数开关、单位与显示名。",
+      "fields": {
+        "slug": {
+          "name": "slug",
+          "description": "英文标识"
+        },
+        "name": {
+          "name": "name",
+          "description": "项目名称"
+        },
+        "need_counter": {
+          "name": "need_counter",
+          "description": "是否计数"
+        },
+        "counter_unit": {
+          "name": "counter_unit",
+          "description": "计数单位"
+        },
+        "counter_label": {
+          "name": "counter_label",
+          "description": "计数显示名"
+        }
+      }
+    },
+    "delete_project": {
+      "name": "删除维护项目",
+      "description": "连同小项与历史一起删除，不可撤销。",
+      "fields": {
+        "slug": {
+          "name": "slug",
+          "description": "英文标识"
+        }
+      }
+    },
+    "list_projects": {
+      "name": "列出维护项目",
+      "description": "返回全部项目及到期汇总。",
+      "fields": {}
+    },
+    "set_counter": {
+      "name": "更新当前计数",
+      "description": "设置某个项目当前的里程 / 次数 / 小时数。",
+      "fields": {
+        "slug": {
+          "name": "slug",
+          "description": "英文标识"
+        },
+        "value": {
+          "name": "value",
+          "description": "当前数值"
+        }
+      }
+    },
+    "add_item": {
+      "name": "新增维护小项",
+      "description": "给项目加一件要做的事。",
+      "fields": {
+        "slug": {
+          "name": "slug",
+          "description": "英文标识"
+        },
+        "name": {
+          "name": "name",
+          "description": "维护内容"
+        },
+        "interval_days": {
+          "name": "interval_days",
+          "description": "间隔天数"
+        },
+        "interval_counter": {
+          "name": "interval_counter",
+          "description": "间隔计数"
+        },
+        "note": {
+          "name": "note",
+          "description": "备注"
+        }
+      }
+    },
+    "update_item": {
+      "name": "修改维护小项",
+      "description": "改小项名称、周期与备注。",
+      "fields": {
+        "slug": {
+          "name": "slug",
+          "description": "英文标识"
+        },
+        "item_id": {
+          "name": "item_id",
+          "description": "小项 ID"
+        },
+        "name": {
+          "name": "name",
+          "description": "维护内容"
+        },
+        "interval_days": {
+          "name": "interval_days",
+          "description": "间隔天数"
+        },
+        "interval_counter": {
+          "name": "interval_counter",
+          "description": "间隔计数"
+        },
+        "note": {
+          "name": "note",
+          "description": "备注"
+        }
+      }
+    },
+    "delete_item": {
+      "name": "删除维护小项",
+      "description": "删掉一个小项。",
+      "fields": {
+        "slug": {
+          "name": "slug",
+          "description": "英文标识"
+        },
+        "item_id": {
+          "name": "item_id",
+          "description": "小项 ID"
+        }
+      }
+    },
+    "set_baseline": {
+      "name": "改上次维护基准",
+      "description": "初次使用时填上次实际维护日期与计数，不产生历史记录。",
+      "fields": {
+        "slug": {
+          "name": "slug",
+          "description": "英文标识"
+        },
+        "item_id": {
+          "name": "item_id",
+          "description": "小项 ID"
+        },
+        "last_date": {
+          "name": "last_date",
+          "description": "上次日期"
+        },
+        "last_counter": {
+          "name": "last_counter",
+          "description": "上次计数"
+        }
+      }
+    },
+    "log_service": {
+      "name": "记录一次维护",
+      "description": "一次可勾选多个小项，写入历史并更新基准。",
+      "fields": {
+        "slug": {
+          "name": "slug",
+          "description": "英文标识"
+        },
+        "item_ids": {
+          "name": "item_ids",
+          "description": "小项 ID 列表"
+        },
+        "date": {
+          "name": "date",
+          "description": "维护日期"
+        },
+        "counter": {
+          "name": "counter",
+          "description": "当前计数"
+        },
+        "note": {
+          "name": "note",
+          "description": "统一备注"
+        },
+        "item_notes": {
+          "name": "item_notes",
+          "description": "逐项备注"
+        }
+      }
+    },
+    "update_record": {
+      "name": "修改一条记录",
+      "description": "改历史记录里指定小项的那一份。",
+      "fields": {
+        "slug": {
+          "name": "slug",
+          "description": "英文标识"
+        },
+        "record_id": {
+          "name": "record_id",
+          "description": "记录 ID"
+        },
+        "item_id": {
+          "name": "item_id",
+          "description": "小项 ID"
+        },
+        "date": {
+          "name": "date",
+          "description": "日期"
+        },
+        "counter": {
+          "name": "counter",
+          "description": "计数"
+        },
+        "note": {
+          "name": "note",
+          "description": "备注"
+        }
+      }
+    },
+    "delete_record": {
+      "name": "删除一条记录",
+      "description": "从历史记录里删掉指定小项。",
+      "fields": {
+        "slug": {
+          "name": "slug",
+          "description": "英文标识"
+        },
+        "record_id": {
+          "name": "record_id",
+          "description": "记录 ID"
+        },
+        "item_id": {
+          "name": "item_id",
+          "description": "小项 ID"
+        }
+      }
+    },
+    "export_markdown": {
+      "name": "导出 Markdown",
+      "description": "把一个项目导出为 Markdown 文本。",
+      "fields": {
+        "slug": {
+          "name": "slug",
+          "description": "英文标识"
+        }
+      }
+    },
+    "sync_maintenance_todos": {
+      "name": "同步维护到期为待办",
+      "description": "把已到期与快到期的维护项写成 [维护] 前缀的待办，重复调用会先清掉旧的同步项。",
+      "fields": {}
     }
   }
 }

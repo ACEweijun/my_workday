@@ -1,1795 +1,258 @@
 <!DOCTYPE html>
-<html data-page-node-id="47xPfitaHeOim4U6xiwEd4" lang="zh-CN">
-<head data-page-node-id="T4dS2Mepi10ZDEElJlkeZ6">
-<script data-page-node-id="C1VRm10CuedkN0YhdQtlqH" src="/page/page_comm/inject.js"></script>
-<meta data-page-node-id="pW2vHanNq7D6lzaVPuc6FP" charset="utf-8">
-<meta data-page-node-id="nAAaS1D3f56K8ruaRft0FU" content="width=device-width,initial-scale=1,viewport-fit=cover" name="viewport">
-<title data-page-node-id="Npg25BEnJAwoCpbwhJH9X4" data-pnid-children="BuYIWvgRCqWMJ3mRR3zOIO">我的工作日</title>
-<style data-page-node-id="Q0SGLx2ZHH67Sh7nlt12dM" data-pnid-children="AWm0pp7XMLTtetTmaXLHr9">
-  :root{
-    --bg:#f4f5f7; --card:#fff; --line:#e3e6ea; --txt:#1f2328; --dim:#6b7280;
-    --work-bg:#e9f1ff; --work-tx:#1b4b8f;
-    --rest-bg:#f0f1f3; --rest-tx:#9aa0a8;
-    --fix:#e8770d; --hol:#c0392b; --blue:#2563eb;
-    --btn-bg:#fff; --fix-rest:#8e97a5;
-    --warn-bg:#fff6e6; --warn-bd:#f2ddb4; --warn-tx:#8a5b00; --ok:#1a7f37; --wkend:#b08a8a;
-    --code-bg:#fbfbfc;
-  }
-  @media (prefers-color-scheme: dark){
-    :root{
-      --bg:#0f1115; --card:#181b21; --line:#2a2f37; --txt:#e6e8eb; --dim:#8b929c;
-      --work-bg:#1c2b45; --work-tx:#a6c6f7;
-      --rest-bg:#262b33; --rest-tx:#8d95a1;
-      --fix:#f0913a; --hol:#e0705e; --blue:#4f8ff7;
-      --btn-bg:#20242b; --fix-rest:#6f7885;
-      --warn-bg:#2a2314; --warn-bd:#4a3c1c; --warn-tx:#e0c07a; --ok:#5fbf7d; --wkend:#9c7f7f;
-      --code-bg:#14171c;
-    }
-  }
-  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-  body{margin:0;background:var(--bg);color:var(--txt);overflow-x:hidden;
-       font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif}
-  .app{max-width:760px;margin:0 auto;padding:12px 14px 30px}
-
-  .banner{margin-bottom:10px;padding:8px 11px;border-radius:10px;background:var(--warn-bg);
-          border:1px solid var(--warn-bd);color:var(--warn-tx);font-size:13.5px;display:none;line-height:1.55}
-  .banner.show{display:block}
-
-  /* 顶部概览：一条卡片分成三段，用竖线分隔，比三个独立方块更整 */
-  .stats{display:grid;grid-template-columns:1.25fr 1fr 1.25fr;gap:0;margin-bottom:12px;
-         background:var(--card);border:1px solid var(--line);border-radius:14px;overflow:hidden}
-  .stat{padding:13px 15px;min-width:0;position:relative;text-align:center}
-  .stat + .stat::before{content:"";position:absolute;left:0;top:13px;bottom:13px;width:1px;
-                        background:var(--line)}
-  .stat b{display:block;font-size:30px;line-height:1.08;font-weight:800;
-          font-variant-numeric:tabular-nums;letter-spacing:-.6px}
-  .stat b i.unit{font-style:normal;font-size:13px;font-weight:600;color:var(--dim);
-                 margin-left:2px;letter-spacing:0}
-  .stat small{display:block;color:var(--dim);font-size:12px;margin-top:5px;line-height:1.35;
-              overflow-wrap:anywhere}
-  .stat.hl b{color:var(--blue)}
-  #statHoliday b{color:var(--fix)}
-  #statHoliday small{font-size:11.5px;line-height:1.4}
-  #statToday{cursor:pointer;transition:background .12s}
-  #statToday:hover{background:var(--bg)}
-
-  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px;margin-bottom:12px}
-  .calbar{display:flex;align-items:center;gap:6px;margin-bottom:10px}
-  .ymwrap{flex:1 1 auto;display:flex;gap:6px;align-items:center;justify-content:center;min-width:0}
-  .calbar select{font:inherit;font-size:16px;font-weight:700;padding:6px 20px 6px 8px;
-                 border-radius:9px;border:1px solid var(--line);
-                 background-color:var(--btn-bg);color:var(--txt);
-                 background-image:url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath fill='%239aa0a8' d='M0 0h10L5 6z'/%3E%3C/svg%3E");
-                 background-repeat:no-repeat;background-position:right 7px center;background-size:9px;
-                 font-variant-numeric:tabular-nums;text-align:center;text-align-last:center;
-                 -webkit-appearance:none;appearance:none;cursor:pointer;
-                 -webkit-tap-highlight-color:transparent}
-  #selYear{min-width:84px}
-  #selMonth{min-width:66px}
-  button{font:inherit;font-weight:600;cursor:pointer;border-radius:10px;border:1px solid var(--line);
-         background:var(--btn-bg);color:var(--txt);padding:7px 12px;transition:.12s}
-  button:active{transform:scale(.97)}
-  button.primary{background:var(--blue);border-color:var(--blue);color:#fff;font-weight:600}
-  button:disabled{opacity:.45;cursor:default}
-  .nav{width:38px;padding:7px 0;font-size:20px;font-weight:700}
-
-  .weekhead,.grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:5px}
-  .weekhead{color:var(--dim);font-size:13px;font-weight:800;letter-spacing:.5px;text-align:center;margin-bottom:6px}
-  .weekhead span:nth-child(6),.weekhead span:nth-child(7){color:var(--wkend)}
-
-  .d{position:relative;border-radius:10px;height:66px;min-width:0;overflow:hidden;padding:6px 6px;
-     border:1px solid transparent;display:flex;flex-direction:column;gap:1px;
-     cursor:pointer;user-select:none;transition:box-shadow .12s}
-  .d.other{opacity:.42}
-  .d.other:hover{opacity:.65}
-  .d .n{font-size:18px;font-weight:750;font-variant-numeric:tabular-nums;line-height:1.1}
-  .d .t{font-size:11.5px;font-weight:600;line-height:1.25;letter-spacing:-.2px}
-  .d.is-work{background:var(--work-bg);color:var(--work-tx)}
-  .d.is-rest{background:var(--rest-bg);color:var(--rest-tx)}
-  .d .t.mk{color:var(--hol)}
-  .d.fix-work{box-shadow:inset 0 0 0 2px var(--fix)}
-  .d.fix-rest{box-shadow:inset 0 0 0 2px var(--fix-rest)}
-  .d .flag{position:absolute;top:4px;right:5px;font-size:10px;font-weight:700;
-           background:var(--fix);color:#fff;border-radius:4px;padding:0 3px;line-height:13px}
-  .d.fix-rest .flag{background:var(--fix-rest)}
-  .d.today{outline:2px solid var(--blue);outline-offset:1px}
-  .d.selected{outline:3px dashed var(--fix);outline-offset:1px}
-  .d.today .n{color:var(--blue)}
-  .d .marks{position:absolute;top:5px;right:5px;display:flex;gap:2px;align-items:center}
-  .d.has-flag .marks{top:20px;right:5px}
-  .d .marks i{display:block;font-style:normal;font-size:9.5px;font-weight:700;line-height:12px;
-              padding:0 2.5px;border-radius:3px;color:#fff;letter-spacing:0}
-  .d .marks i.t{background:var(--blue)}
-  .d .marks i.a{background:var(--fix)}
-  .d .tsum{margin-top:auto;font-size:10.5px;line-height:1.2;font-weight:600;opacity:.72;
-           overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .d.has-cnt .tsum{padding-right:22px}
-  .d .cnt{position:absolute;right:4px;bottom:4px;min-width:16px;height:16px;padding:0 4px;
-          border-radius:9px;background:var(--hol);color:#fff;font-size:10px;font-weight:700;
-          line-height:16px;text-align:center;font-variant-numeric:tabular-nums;
-          box-shadow:0 0 0 2px var(--card)}
-
-  .sec-head{display:flex;align-items:center;gap:8px;margin-bottom:6px}
-  .sec-head h2{font-size:15px;margin:0;font-weight:700;flex:1}
-  .sec-head button{padding:5px 10px;font-size:13px}
-  .sec-head .hd-sum{font-size:12px;color:var(--dim);font-weight:600;font-variant-numeric:tabular-nums}
-  /* 整条横杆都能点：标题 + 空白 + 右侧按钮一起切换折叠 */
-  .sec-head.fold-head{cursor:pointer;padding:5px 6px;margin:-5px -6px 1px;border-radius:9px;
-                       transition:background .12s;-webkit-tap-highlight-color:transparent}
-  .sec-head.fold-head:hover{background:var(--bg)}
-  .sec-head.fold-head h2,.sec-head.fold-head .hd-sum{pointer-events:none}
-  .sec-head.fold-head .hd-tg{flex:0 0 auto;font-size:13px;font-weight:600;color:var(--txt);
-                             padding:5px 10px;border:1px solid var(--line);border-radius:10px;
-                             background:var(--btn-bg);transition:.12s}
-  .sec-head.fold-head:hover .hd-tg{border-color:var(--blue);color:var(--blue)}
-  .sec-head.fold-head:active .hd-tg{transform:scale(.97)}
-  .fold{display:none}
-  .fold.show{display:block}
-  textarea{width:100%;font:16px/1.6 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
-           padding:9px 10px;border:1px solid var(--line);border-radius:9px;
-           background:var(--code-bg);color:var(--txt);resize:vertical}
-  textarea:focus{outline:2px solid var(--blue);outline-offset:-1px}
-  .hint{font-size:12.5px;color:var(--dim);margin:6px 0 14px;line-height:1.65}
-
-  .actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:4px}
-  button:disabled{opacity:.55;cursor:progress}
-  .msg{font-size:13.5px;color:var(--dim);flex-basis:100%;min-height:20px;line-height:1.6}
-  .msg:empty{min-height:0}
-  .msg.ok{color:var(--ok)}.msg.err{color:var(--hol)}
-
-  .anniv{list-style:none;margin:10px 0 0;padding:0;display:flex;flex-direction:column;gap:6px}
-  .anniv li{display:flex;align-items:baseline;gap:8px;padding:7px 10px;border-radius:9px;
-            background:var(--code-bg);border:1px solid var(--line);font-size:13.5px}
-  .anniv .an-name{font-weight:700;flex:0 0 auto}
-  .anniv .an-date{color:var(--dim);font-size:12.5px;flex:1 1 auto;min-width:0;
-                  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .anniv .an-left{font-weight:700;color:var(--blue);flex:0 0 auto;font-variant-numeric:tabular-nums}
-  .anniv .an-del{margin-left:2px;border:0;background:transparent;color:var(--dim);
-                 font-size:17px;line-height:1;padding:0 5px;cursor:pointer;border-radius:6px}
-  .anniv .an-del:hover{color:var(--hol);background:var(--bg)}
-  .anniv li.today{background:var(--work-bg);border-color:var(--blue)}
-  .anniv li.today .an-left{color:var(--hol)}
-  .anniv li.empty{color:var(--dim);background:transparent;border-style:dashed;font-size:12.5px}
-
-  .anniv-form{display:none;flex-wrap:wrap;gap:8px;align-items:center;margin:2px 0 10px;
-              padding:10px;border:1px dashed var(--line);border-radius:10px;background:var(--code-bg)}
-  .anniv-form.show{display:flex}
-  .anniv-form input[type=text],.anniv-form input[type=date]{
-    font:inherit;font-size:16px;padding:7px 9px;border:1px solid var(--line);border-radius:8px;
-    background:var(--btn-bg);color:var(--txt)}
-  .anniv-form input[type=text]{flex:1 1 130px;min-width:0}
-  .anniv-form input[type=date]{flex:0 0 auto}
-  .anniv-rep{display:inline-flex;align-items:center;gap:5px;font-size:13px;color:var(--dim);cursor:pointer}
-  .anniv-form .fhint{flex-basis:100%;font-size:11.5px;color:var(--dim);margin-top:2px}
-
-  /* 待办列表：复用 .anniv 布局，补勾选框与状态 */
-  .todos .an-name{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .todos .td-cb{width:16px;height:16px;flex:0 0 auto;margin:0;accent-color:var(--blue);cursor:pointer}
-  .todos li.done .an-name{text-decoration:line-through;color:var(--dim)}
-  .todos li.done{opacity:.68}
-  .todos li .td-rel{flex:0 0 auto;color:var(--dim);font-size:12px;font-weight:600;
-                    font-variant-numeric:tabular-nums}
-  .todos li.overdue .td-rel{color:var(--hol)}
-  .todos li.today .td-rel{color:var(--blue)}
-  /* 分组小标题：逾期 / 今天 / 未来 7 天 / 以后 / 已完成 */
-  .todos li.td-grp{display:flex;align-items:center;gap:6px;padding:0 2px;margin:9px 0 1px;
-                   background:transparent;border:0;font-size:12px;font-weight:700;
-                   color:var(--dim);letter-spacing:.4px}
-  .todos li.td-grp:first-child{margin-top:0}
-  .todos li.td-grp.late{color:var(--hol)}
-  .todos li.td-grp .g-n{font-weight:600;font-variant-numeric:tabular-nums}
-  .todos li.td-grp .g-tg{margin-left:auto;border:0;background:transparent;color:var(--dim);
-                         font-size:12px;font-weight:600;padding:0 3px;border-radius:6px;cursor:pointer}
-  .todos li.td-grp .g-tg:hover{color:var(--txt);background:var(--bg)}
-
-  /* 右键 / 长按菜单 */
-  .ctx{position:fixed;z-index:120;width:266px;padding:6px;display:none;
-       background:var(--card);border:1px solid var(--line);border-radius:11px;
-       box-shadow:0 12px 30px rgba(0,0,0,.18)}
-  .ctx.show{display:block}
-  .ctx .ctx-title{font-size:12px;font-weight:600;color:var(--dim);padding:3px 9px 8px}
-  .ctx .ctx-item.ctx-add{color:var(--blue)}
-  .ctx .ctx-type{display:flex;gap:6px;margin:0 0 7px}
-  .ctx .ctx-type-btn{flex:1 1 0;padding:7px 6px;font-size:13.5px;font-weight:700;
-                      border:1px solid var(--line);border-radius:9px;
-                      background:var(--btn-bg);color:var(--txt)}
-  .ctx .ctx-type-btn.on{background:var(--blue);border-color:var(--blue);color:#fff}
-  .ctx .ctx-rep{padding-top:0}
-  .ctx .ctx-item{display:block;width:100%;text-align:left;border:0;background:transparent;
-                 color:var(--txt);font-size:14px;font-weight:600;padding:8px 9px;border-radius:8px}
-  .ctx .ctx-item:hover{background:var(--bg)}
-  .ctx .ctx-row{display:flex;gap:6px;align-items:center;padding:3px 2px}
-  .ctx input[type=text],.ctx input[type=date]{
-    width:100%;font:inherit;font-size:16px;padding:7px 9px;border:1px solid var(--line);
-    border-radius:8px;background:var(--btn-bg);color:var(--txt)}
-  .ctx input[type=text]:focus,.ctx input[type=date]:focus{outline:2px solid var(--blue);outline-offset:-1px}
-  .ctx .ctx-actions{display:flex;gap:6px;justify-content:flex-end;margin-top:8px}
-  .ctx .ctx-actions button{padding:6px 12px;font-size:13.5px}
-
-  /* 菜单里的「当天条目」列表：文字超宽时单行横向滚动，右侧固定「完成」「×」 */
-  .ctx .ctx-todos{display:flex;flex-direction:column;gap:4px;max-height:186px;overflow-y:auto;
-                  margin:1px 0 5px;padding:1px}
-  .ctx .ct-row{display:flex;align-items:center;gap:5px;padding:4px 5px;border-radius:8px;
-               background:var(--code-bg);border:1px solid var(--line)}
-  .ctx .ct-text{flex:1 1 auto;min-width:0;overflow-x:auto;overflow-y:hidden;white-space:nowrap;
-                font-size:13.5px;font-weight:600;line-height:1.5;padding:1px 0;cursor:pointer;
-                -webkit-overflow-scrolling:touch}
-  .ctx .ct-text::-webkit-scrollbar{height:3px}
-  .ctx .ct-text::-webkit-scrollbar-track{background:transparent}
-  .ctx .ct-text::-webkit-scrollbar-thumb{background:var(--dim);opacity:.55;border-radius:2px}
-  .ctx .ct-row.done .ct-text{text-decoration:line-through;color:var(--dim)}
-  .ctx .ct-tag{flex:0 0 auto;font-size:10px;font-weight:700;line-height:14px;padding:0 4px;
-               border-radius:4px;background:var(--fix);color:#fff}
-  .ctx .ct-tag.t{background:var(--blue)}
-  .ctx .ct-tag.a{background:var(--fix)}
-  .ctx .ct-text.static{cursor:default}
-  .ctx .ct-done{flex:0 0 auto;padding:3px 8px;font-size:11.5px;font-weight:600;
-                border:1px solid var(--line);border-radius:7px;background:var(--btn-bg);color:var(--txt)}
-  .ctx .ct-done:hover{border-color:var(--blue);color:var(--blue)}
-  .ctx .ct-del{flex:0 0 auto;padding:0 4px;font-size:15px;line-height:1;border:0;
-                background:transparent;color:var(--dim);cursor:pointer;border-radius:6px}
-  .ctx .ct-del:hover{color:var(--hol);background:var(--bg)}
-
-  footer{text-align:center;color:var(--dim);font-size:12px;margin-top:14px}
-
-  @media (max-width:470px){
-    .app{padding:14px 11px 26px}
-    .stats{grid-template-columns:1fr 1fr 1fr}
-    .stat{padding:10px 9px}
-    .stat b{font-size:21px;letter-spacing:-.3px}
-    .stat b i.unit{font-size:11px}
-    .stat small{font-size:10.5px;margin-top:4px}
-    .d{height:60px;padding:5px 5px}
-    .d .marks{right:3px}
-    .d .marks i{font-size:8.5px;padding:0 1.5px;border-radius:2.5px}
-    .d .tsum{font-size:10px}
-    .d.has-cnt .tsum{padding-right:18px}
-    .d .cnt{min-width:14px;height:14px;font-size:9px;line-height:14px;right:3px;bottom:3px;padding:0 3px}
-    .d .n{font-size:17px}
-    .d .t{font-size:11px}
-    .calbar{gap:4px}
-    .calbar select{font-size:15px;padding:6px 18px 6px 6px;background-position:right 5px center}
-    #selYear{min-width:74px}
-    #selMonth{min-width:58px}
-    button{padding:7px 10px}
-    .actions button{flex:1 1 auto}
-  }
-</style>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>我的工作日 · 我的日程</title>
+<link rel="stylesheet" href="shared.css">
 </head>
-<body data-page-node-id="9KbpYI3peZMSr1Exr8bqcv">
-<div data-page-node-id="OATAb4q2ldXUpu3iasE0OF" class="app">
-  <div data-page-node-id="qzrOjVpF1J7Pvt4wDWof0W" class="banner" id="banner"></div>
+<body>
+<header class="bar">
+  <b>我的工作日</b>
+  <span class="date" id="dateLabel"></span>
+  <span class="spacer"></span>
+  <a class="link" href="maintenance.html">维护台账<span id="dueBadge" class="badge" hidden></span></a>
+</header>
+<div id="msg" class="msg" hidden></div>
+<main>
+  <section class="stats" id="stats"></section>
 
-  <section data-page-node-id="Uc9n9Zk8Y4PKHY670ZMSZW" class="stats">
-    <div data-page-node-id="UImXeQI7jLoB3cfDabxgXR" class="stat hl"><b data-page-node-id="zYpA0ygiSYoBYRHSvcoouL" id="s-ratio"><!--pnid:88D9drrynHsPAE04L4iD9b-->–</b><small data-page-node-id="hdipspKP4XVd0a0S0UlfkH" id="s-ratio-label"><!--pnid:EIW8eXAc0zkGu1qNLbRtwe-->本月工作日 · 剩余/总数</small></div>
-    <div data-page-node-id="p6HumLvW94ttqqEyECggAz" class="stat" id="statToday" title="点此回到本月"><b data-page-node-id="jtpSH2taIhXXo4HqgqcYyp" id="s-today"><!--pnid:dXot9cOtbANOg793qgzuMP-->–</b><small data-page-node-id="QAYVOyqwEVHcpRbOhh4IQ9" id="s-today-label"><!--pnid:pPqGn8dUZBJSR3lXjSZ1eg-->今天</small></div>
-    <div data-page-node-id="aJdG43QwSvYIlAEcaKLBSU" class="stat" id="statHoliday"><b data-page-node-id="E2Qw3qSXvixFM2EWODvxB5" id="s-holiday"><!--pnid:6ECVtyrA5EsRBjpYejM3JJ-->–</b><small data-page-node-id="zRtyc5x5b7c1STpjzsr8Uv" id="s-holiday-label"><!--pnid:0JmnaikGnMEaNs9HKX7Xnv-->距离下个节假日</small></div>
+  <section class="card">
+    <div class="card-head">
+      <h2 id="calTitle"></h2><span class="spacer"></span>
+      <button class="ghost" id="prevM">‹</button>
+      <button class="ghost" id="thisM">本月</button>
+      <button class="ghost" id="nextM">›</button>
+    </div>
+    <div class="cal-head" id="calHead"></div>
+    <div class="cal" id="cal"></div>
+    <div class="hint" id="sourceLabel" style="margin-top:8px"></div>
   </section>
 
-  <section data-page-node-id="L98rvqDKQBYsk3nug0ncMe" class="card">
-    <div data-page-node-id="zb1lTPCdc5zZhFIiAqJ4mo" class="calbar">
-      <button data-page-node-id="PZ385Z41mAXWm4jnvgoDV3" aria-label="上个月" class="nav" id="prev"><!--pnid:mPe6uJxtScB6xn5OZ7gPHi-->‹</button>
-      <div data-page-node-id="qBFFl1kih3o5ORP2toRXsn" class="ymwrap">
-        <select data-page-node-id="NGJdb6Zblw25IKId6mNNwD" aria-label="年份" id="selYear"></select>
-        <select data-page-node-id="1P01wwgpAMUZKE5eTOG0tD" aria-label="月份" id="selMonth"></select>
-      </div>
-      <button data-page-node-id="a5N1XLDbpv8AytSDro7JXT" aria-label="下个月" class="nav" id="next"><!--pnid:v1k4UidWOm276scPqoSRik-->›</button>
+  <section class="card">
+    <div class="card-head"><h2>我的待办</h2><span class="spacer"></span><button class="primary" id="todoAdd">+ 新增</button></div>
+    <div class="form" id="todoForm" hidden>
+      <div><label>日期</label><input type="date" id="todoDate"></div>
+      <div class="full"><label>要做什么</label><input id="todoText" placeholder="回车保存 · Esc 取消"></div>
     </div>
-    <div data-page-node-id="VJUpG9xzyvwgbzP6RFFVQb" class="weekhead"><span data-page-node-id="pItAF6VtcolxbUqAC94Iey"><!--pnid:giaeqfXCA1Po9Uu6SGjDJg-->一</span><span data-page-node-id="Obu4rEuEQx2W1EbajHyb8d"><!--pnid:nIPpgeAVjyS79JAw8fAG9O-->二</span><span data-page-node-id="QbsFSa5yZxkQnWivqnkBym"><!--pnid:CgwjB6mJB7DewGO04gkjaU-->三</span><span data-page-node-id="9CcZ63LtLCDlbWNdUhFpUR"><!--pnid:6Ff5SqVzIPPGY4ThQYhaNa-->四</span><span data-page-node-id="IE8GoGD73d5ekZ336WKKuR"><!--pnid:1YEpSbJyZo0V6kNJQ5jvUh-->五</span><span data-page-node-id="n2ZQCx3kDb8wzAkT9FLdME"><!--pnid:ugnx8dhr1knZxzonBXhiPZ-->六</span><span data-page-node-id="FXXAg2eEoRjp64fbm7q8Ea"><!--pnid:9KFK621bV1GJDCdC85dZT6-->日</span></div>
-    <div data-page-node-id="KjiZ9MTQk6RBWF1i7DWErg" class="grid" id="grid"></div>
+    <div id="todos"></div>
   </section>
 
-  <section data-page-node-id="1VzLx9vr9eafSnmBP21u4D" class="card">
-    <div data-page-node-id="sWcvluBkbrgkJkuIbRgWr2" aria-expanded="false" class="sec-head fold-head" id="todoHead" role="button" tabindex="0">
-      <h2 data-page-node-id="Q3FrenRL1ON5oGAqBTp5zq"><!--pnid:O3f1Phf7iAUwIkkjdywLL6-->我的待办</h2>
-      <span data-page-node-id="N3dhOkk8ehp0kEGyPti7Qk" class="hd-sum" id="todoSum"></span>
-      <button data-page-node-id="w839dsfLpUyeCQ2MBHEgtI" id="todoAdd"><!--pnid:foUAtfoKSNZ65cvC6Su3W2-->+ 新增</button>
-      <span data-page-node-id="jmbhZm3RjsmPFNVXQE9mSK" class="hd-tg" id="todoToggle"><!--pnid:h43hs6csSEukQtymco8kV7-->展开</span>
+  <section class="card">
+    <div class="card-head"><h2>我的纪念日</h2><span class="spacer"></span><button class="primary" id="annAdd">+ 新增</button></div>
+    <div class="form" id="annForm" hidden>
+      <div><label>名称</label><input id="annName" placeholder="生日"></div>
+      <div><label>日期</label><input id="annDate" placeholder="05-20 或 2026-12-01"></div>
+      <div><label>每年重复</label><select id="annRepeat"><option value="1">是</option><option value="0">否</option></select></div>
+      <div class="full"><button class="primary" id="annSave">保存</button></div>
     </div>
-    <div data-page-node-id="QcepOUiowuWGNes2YUOUF4" class="fold" id="todoBody">
-      <div data-page-node-id="V4jZvNiK49GuMXEXiEzwaY" class="anniv-form" id="todoForm">
-        <input data-page-node-id="0vIj7kUn4UwgHp6VIXOeYV" id="todoText" maxlength="60" placeholder="要做什么" type="text">
-        <input data-page-node-id="fkYumAlKkKJMF6mDjlzgPB" id="todoDate" type="date">
-        <span data-page-node-id="wr5y9I12MyIRn5DetyTMeN" class="fhint"><!--pnid:bC3EnHZxoP2lhm1iBz57XF-->回车保存 · Esc 取消</span>
-      </div>
-      <ul data-page-node-id="AhDM8UL9cOJD8RBva1YEmK" class="anniv todos" id="todoList"></ul>
-    </div>
+    <div id="anns"></div>
   </section>
 
-  <section data-page-node-id="5dLpbovnKfS14HyUIgOsr8" class="card">
-    <div data-page-node-id="8jlXdJlf8ikx5R8qujIYzk" aria-expanded="false" class="sec-head fold-head" id="annivHead" role="button" tabindex="0">
-      <h2 data-page-node-id="5Gu7FaVnpA2XldIszKNh5p"><!--pnid:yHqRbJeDFxpy1cKwu6bwhM-->我的纪念日</h2>
-      <span data-page-node-id="GiYb9kbzVoi225YcswP4nh" class="hd-sum" id="annivSum"></span>
-      <button data-page-node-id="yV7LjcYWjn8YKZJs2zX1qQ" id="annivAdd"><!--pnid:U5yoYktcdsI62HHqZFzuS5-->+ 新增</button>
-      <span data-page-node-id="skrR0NcKywcQ8nvJvrkRyI" class="hd-tg" id="annivToggle"><!--pnid:CBwrCNTdVFYu0U0OpQnZsu-->展开</span>
-    </div>
-    <div data-page-node-id="INFOAz8a5Dmb08z0UC5FYy" class="fold" id="annivBody">
-      <div data-page-node-id="f32i0PzncH3t5N7j93A91m" class="anniv-form" id="annivForm">
-        <input data-page-node-id="uVWkcPNqsBx7cLuQ8WAsvL" id="annivName" maxlength="24" placeholder="名称，如 生日" type="text">
-        <input data-page-node-id="hwNldSNuEy9H3aQkCGhelq" id="annivDate" type="date">
-        <label data-page-node-id="cJxWH43EcHiPDbVURJTRrC" class="anniv-rep"><input data-page-node-id="UWR5rMYBpziU8zF1odi6Nr" checked id="annivRepeat" type="checkbox"><!--pnid:BD63i33L2DGhThBWFApKuY--> 每年重复</label>
-        <span data-page-node-id="sK8vYgGaoD4O4pmUrX0deC" class="fhint"><!--pnid:BLOuOXCBjr9QhN7INgYg9L-->回车保存 · Esc 取消</span>
-      </div>
-      <ul data-page-node-id="u3bLI4oWqSlC5OPP7cXW0q" class="anniv" id="annivList"></ul>
-    </div>
+  <section class="card">
+    <div class="card-head"><h2>我自定义的工作日</h2><span class="spacer"></span><button class="primary" id="customSave">保存</button></div>
+    <textarea id="customText" placeholder="上班: 2026-11-28,2026-11-29&#10;休息: 2026-11-27"></textarea>
+    <div class="hint" style="margin-top:6px">含「班」的行算上班，含「休 / 假」的行算休息；清空即取消全部自定义。</div>
   </section>
 
-  <section data-page-node-id="TyAq5qn1Nvfzp4dPAi1gts" class="card">
-    <div data-page-node-id="F1K779nND9iEtVcw9Y66wj" aria-expanded="false" class="sec-head fold-head" id="customHead" role="button" tabindex="0">
-      <h2 data-page-node-id="C5LMrg8wheyArRmfynSvDd"><!--pnid:5Y7rxtWYNRwQb9s2SYHr96-->我自定义的工作日</h2>
-      <span data-page-node-id="3Z0yp9OYWlIg8HUSNa4f70" class="hd-sum" id="customSum"></span>
-      <span data-page-node-id="ByLABkONToBecZOidDYpvC" class="hd-tg" id="customToggle"><!--pnid:QrWwp2mbg3hLcfNuruACqQ-->展开</span>
-    </div>
-    <div data-page-node-id="3vHd7GxIhBmKmsvj5xzLmz" class="fold" id="customBody">
-      <textarea data-page-node-id="aWoQkUoityreoLEdeT2kUi" id="customText" placeholder="上班: 2026-11-28,2026-11-29&#10;休息: 2026-11-27" rows="3" spellcheck="false"></textarea>
-    </div>
-
-    <div data-page-node-id="vSbkmWMK5xsnaNpx8jKjq3" class="msg" id="msg"></div>
+  <section class="card">
+    <div class="card-head"><h2>维护到期</h2><span class="spacer"></span><a class="link" href="maintenance.html">去处理 →</a></div>
+    <div id="dueList"></div>
   </section>
-
-  <div data-page-node-id="tIYXAPsHeJDMYy8E5gwpsg" class="ctx" id="ctx"></div>
-  <footer data-page-node-id="RhHm9cwTohGrPiR9cRdVmA"><!--pnid:Zivvijex4RNFeb9jKvqxzE-->我的工作日 · 国家放假与调休每年自动获取</footer>
-
-</div>
-
-<script data-page-node-id="KGXLaSrnWTbwykWJzAxURT" data-pnid-children="EGoigXNh7bWyC6gZyUvssc">
+</main>
+<script src="shared.js"></script>
+<script>
 (function () {
   'use strict';
+  var M = window.MW, $ = M.$, S = null, busy = false, year, month;
 
-  var P = new URLSearchParams(location.search);
-  var LOCAL = location.protocol === 'file:';   // 演示 / 自测仅本地预览可用
-  var ENTITY_LEFT = 'sensor.my_workday_left';
-
-  var autoToken = null;
-  var autoTokenExp = 0;          // token 到期时间（秒），到期要重新取
-  var ovr = { work: new Set(), rest: new Set() };
-  var nyHol = { off: new Set(), mk: new Set(), names: {} };   // 次年数据，用于跨年倒计时
-  var view;
-  var selected = null;             // 当前选中的格子（第一次点击只选中）
-  var holText = '';                      // 集成给的年度数据（只读，来自 sensor 属性）
-  var dataSourceLabel = '未连接';        // 数据来源，状态提示用
-  var todos = [];                        // 待办：[{date, text, done}]
-  var ctxDate = null;                    // 右键菜单当前对准的日期
-  var ctxMode = 'menu';                  // menu / todo / todoedit / anniv
-  var ctxTodo = null;                    // 正在编辑的那条待办
-  var ctxAnniv = null;                   // 正在编辑的那个纪念日
-  var ctxNewType = null;                 // 「新增」页当前选中的类型：todo / anniv / null
-  var ctxAnchor = null;                  // 菜单弹出时的锚点坐标，视口变化时用来重新贴合
-  var lpFired = false;                   // 长按已弹菜单，用来吞掉紧随的 click
-  var doneOpen = false;                  // 「已完成」分组默认收起
-  var foldState = { custom: false, todo: false, anniv: false };   // 三张卡片的折叠状态（默认全收起）
-
-  var pad = function (n) { return (n < 10 ? '0' : '') + n; };
-  var iso = function (d) { return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); };
-  var isoOf = function (y, m, d) { return y + '-' + pad(m) + '-' + pad(d); };
-  var todayDate = function () { return P.get('date') ? new Date(P.get('date') + 'T00:00:00') : new Date(); };
-  var TODAY = todayDate();
-  var TODAY_ISO = iso(TODAY);
-  var dataYear = TODAY.getFullYear();   // 文本框里那份数据属于哪一年
-
-  var $ = function (id) { return document.getElementById(id); };
-
-  /* ---------------- 卡片折叠（整条横杆都能点，状态记在本地） ---------------- */
-  function loadFold() {
-    try {
-      var raw = localStorage.getItem('my_workday_fold2');
-      if (!raw) { return; }
-      var o = JSON.parse(raw);
-      Object.keys(foldState).forEach(function (k) {
-        if (typeof o[k] === 'boolean') { foldState[k] = o[k]; }
-      });
-    } catch (e) { /* 隐私模式禁用存储时用默认值 */ }
-  }
-  function saveFold() {
-    try { localStorage.setItem('my_workday_fold2', JSON.stringify(foldState)); } catch (e) {}
-  }
-  function syncFold(key) {
-    var body = $(key + 'Body'), tg = $(key + 'Toggle'), head = $(key + 'Head');
-    if (body) { body.classList.toggle('show', !!foldState[key]); }
-    if (tg) { tg.textContent = foldState[key] ? '收起' : '展开'; }
-    if (head) { head.setAttribute('aria-expanded', foldState[key] ? 'true' : 'false'); }
-  }
-  function toggleFold(key) {
-    foldState[key] = !foldState[key];
-    syncFold(key);
-    saveFold();
-  }
-  function setupFold(key) {
-    var head = $(key + 'Head');
-    if (!head) { return; }
-    head.addEventListener('click', function (e) {
-      if (e.target.closest('button')) { return; }   // 横条里的按钮（+ 新增）不触发折叠
-      toggleFold(key);
-    });
-    head.addEventListener('keydown', function (e) {
-      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleFold(key); }
-    });
-    syncFold(key);
-  }
-
-  /* ---------------- 解析用户粘贴的年度安排 ---------------- */
-  function parseYearText(text) {
-    var off = new Set(), mk = new Set(), names = {}, err = null;
-    var raw = (text || '').trim();
-    if (!raw) { return { off: off, mk: mk, names: names, err: null }; }
-
-    if (raw.charAt(0) === '{' || raw.charAt(0) === '[') {
-      var payload;
-      try { payload = JSON.parse(raw); } catch (e) { return { off: off, mk: mk, names: names, err: 'JSON 解析失败' }; }
-      var days = Array.isArray(payload) ? payload : (payload.days || []);
-      days.forEach(function (it) {
-        if (!it || !it.date || String(it.date).length !== 10) { return; }
-        if (it.isOffDay) { off.add(it.date); names[it.date] = it.name || ''; }
-        else { mk.add(it.date); }
-      });
-      return { off: off, mk: mk, names: names, err: null };
-    }
-
-    var RANGE = /(\d{4}-\d{2}-\d{2})\s*(?:~|～|至|到|—|--)\s*(\d{4}-\d{2}-\d{2})/g;
-    raw.split('\n').forEach(function (line) {
-      var s = line.trim();
-      if (!s || s.charAt(0) === '#') { return; }
-      var dates = [];
-      RANGE.lastIndex = 0;
-      var m;
-      while ((m = RANGE.exec(s)) !== null) {
-        var a = new Date(m[1] + 'T00:00:00');
-        var b = new Date(m[2] + 'T00:00:00');
-        if (isNaN(a) || isNaN(b)) { continue; }
-        if (b < a) { var c = a; a = b; b = c; }
-        var span = Math.round((b - a) / 86400000);
-        if (span > 400) { continue; }
-        for (var i = 0; i <= span; i++) { dates.push(iso(new Date(a.getTime() + i * 86400000))); }
-      }
-      var restLine = s.replace(RANGE, ' ');
-      (restLine.match(/\d{4}-\d{2}-\d{2}/g) || []).forEach(function (d) { dates.push(d); });
-      if (!dates.length) { return; }
-      var isWork = s.indexOf('班') >= 0 || /work/i.test(s);
-      dates.forEach(function (d) {
-        if (isWork) { mk.add(d); }
-        else { off.add(d); if (!(d in names)) { names[d] = ''; } }
-      });
-    });
-    return { off: off, mk: mk, names: names, err: err };
-  }
-
-  /* ---------------- 解析自定义日期文本 ---------------- */
-  function parseCustomText(text) {
-    var work = [], rest = [];
-    (text || '').split('\n').forEach(function (line) {
-      var s = line.trim();
-      if (!s) { return; }
-      var dates = s.match(/\d{4}-\d{2}-\d{2}/g) || [];
-      if (!dates.length) { return; }
-      if (s.indexOf('班') >= 0) { work = work.concat(dates); }
-      else if (s.indexOf('休') >= 0 || s.indexOf('假') >= 0) { rest = rest.concat(dates); }
-    });
-    return { work: work, rest: rest };
-  }
-  function customTextFromOvr() {
-    var w = Array.from(ovr.work).sort().join(',');
-    var r = Array.from(ovr.rest).sort().join(',');
-    var lines = [];
-    if (w) { lines.push('上班: ' + w); }
-    if (r) { lines.push('休息: ' + r); }
-    return lines.join('\n');
-  }
-
-  /* ---------------- 判定 ---------------- */
-  // 自然状态（不含任何自定义覆盖）：法定假=休息，补班=上班，周六日=休息，其余=上班
-  function naturalState(isoDate, hol) {
-    if (hol.off.has(isoDate)) { return 'rest'; }
-    if (hol.mk.has(isoDate)) { return 'work'; }
-    var w = new Date(isoDate + 'T00:00:00').getDay();
-    return (w === 0 || w === 6) ? 'rest' : 'work';
-  }
-
-  function classify(isoDate, hol) {
-    // 先算自然状态
-    var nat = 'work', kind = 'weekday', name = '';
-    if (hol.off.has(isoDate)) { nat = 'rest'; kind = 'holiday'; name = hol.names[isoDate] || ''; }
-    else if (hol.mk.has(isoDate)) { nat = 'work'; kind = 'makeup'; }
-    else {
-      var w = new Date(isoDate + 'T00:00:00').getDay();
-      if (w === 0 || w === 6) { nat = 'rest'; kind = 'weekend'; }
-      else { nat = 'work'; kind = 'weekday'; }
-    }
-    // 自定义标记只有在「改变了自然状态」时才生效并打标识；
-    // 与自然相同的标记视为无效，直接回落到自然状态（不打标识、不误导）。
-    if (ovr.work.has(isoDate) && nat !== 'work') { return { state: 'work', kind: 'custom-work' }; }
-    if (ovr.rest.has(isoDate) && nat !== 'rest') { return { state: 'rest', kind: 'custom-rest' }; }
-    return { state: nat, kind: kind, name: name };
-  }
-  function monthStats(y, m, hol) {
-    var n = new Date(y, m, 0).getDate(), total = 0, left = 0;
-    for (var d = 1; d <= n; d++) {
-      var s = isoOf(y, m, d);
-      if (classify(s, hol).state === 'work') { total++; if (s >= TODAY_ISO) { left++; } }
-    }
-    return { total: total, left: left, days: n };
-  }
-
-  function nextHoliday(parsed, fromISO) {
-    var ups = Array.from(parsed.off).filter(function (d) { return d >= fromISO; }).sort();
-    if (!ups.length) { return null; }
-    var first = ups[0];
-    var start = new Date(first + 'T00:00:00');
-    for (;;) {
-      var prev = iso(new Date(start.getTime() - 86400000));
-      if (!parsed.off.has(prev)) { break; }
-      start = new Date(start.getTime() - 86400000);
-    }
-    var end = new Date(first + 'T00:00:00');
-    for (;;) {
-      var next = iso(new Date(end.getTime() + 86400000));
-      if (!parsed.off.has(next)) { break; }
-      end = new Date(end.getTime() + 86400000);
-    }
-    var days = Math.round((start - new Date(fromISO + 'T00:00:00')) / 86400000);
-    return {
-      name: parsed.names[iso(start)] || '',
-      start: iso(start), end: iso(end),
-      days: Math.max(days, 0),
-      total_days: Math.round((end - start) / 86400000) + 1
-    };
-  }
-
-  /* ---------------- 渲染 ---------------- */
-  function render() {
-    var parsed = parseYearText(holText);
-    var y = view.getFullYear(), m = view.getMonth() + 1;
-    $('selYear').value = String(y);
-    $('selMonth').value = String(m);
-
-    var offset = (new Date(y, m - 1, 1).getDay() + 6) % 7;   // 周一在第一列
-    var n = new Date(y, m, 0).getDate();
-    var grid = $('grid');
-    grid.innerHTML = '';
-
-    // 连上前后月的日期，固定 6 行 42 格，切月时高度不跳
-    var first = new Date(y, m - 1, 1 - offset);
-    var cells = Math.max(Math.ceil((offset + n) / 7) * 7, 42);
-
-    for (var i = 0; i < cells; i++) {
-      var cur = new Date(first.getFullYear(), first.getMonth(), first.getDate() + i);
-      var s = iso(cur);
-      var other = (cur.getFullYear() !== y) || (cur.getMonth() + 1 !== m);
-      var st = classify(s, parsed);
-      var cell = document.createElement('div');
-      cell.className = 'd is-' + st.state + (other ? ' other' : '');
-      cell.dataset.date = s;
-      if (other) { cell.dataset.other = '1'; }
-      if (st.kind === 'custom-work') { cell.classList.add('fix-work'); }
-      if (st.kind === 'custom-rest') { cell.classList.add('fix-rest'); }
-      if (s === TODAY_ISO) { cell.classList.add('today'); }
-      if (s === selected) { cell.classList.add('selected'); }
-
-      var lab = '';
-      if (st.kind === 'holiday') { lab = (st.name || '休').slice(0, 3); }
-      else if (st.kind === 'makeup') { lab = '补班'; }
-
-      var num = document.createElement('div');
-      num.className = 'n';
-      num.textContent = String(cur.getDate());
-      cell.appendChild(num);
-      if (lab) {
-        var tag = document.createElement('div');
-        tag.className = 't mk';
-        tag.textContent = lab;
-        cell.appendChild(tag);
-      }
-      if (st.kind === 'custom-work' || st.kind === 'custom-rest') {
-        var flag = document.createElement('span');
-        flag.className = 'flag';
-        flag.textContent = st.kind === 'custom-work' ? '班' : '休';
-        cell.appendChild(flag);
-        cell.classList.add('has-flag');
-      }
-      var mk = dayMarks(s);
-      if (mk.todo || mk.anniv) {
-        var marks = document.createElement('div');
-        marks.className = 'marks';
-        if (mk.todo) { marks.appendChild(dotOf('t')); }
-        if (mk.anniv) { marks.appendChild(dotOf('a')); }
-        cell.appendChild(marks);
-      }
-      var op = openTodosOf(s);               // 格子里直接显示当天首条待办
-      if (op.length) {
-        var sum = document.createElement('div');
-        sum.className = 'tsum';
-        sum.textContent = op[0].text;
-        sum.title = op.map(function (x) { return x.text; }).join(' / ');
-        cell.appendChild(sum);
-        if (op.length > 1) {                 // 多条时右下角挂个醒目的数量角标
-          var cnt = document.createElement('div');
-          cnt.className = 'cnt';
-          cnt.textContent = op.length;
-          cnt.title = op.length + ' 条未完成待办';
-          cell.appendChild(cnt);
-          cell.classList.add('has-cnt');
-        }
-      }
-      grid.appendChild(cell);
-    }
-
-    var cs = $('customSum');                       // 折叠状态下也能看到有多少条自定义
-    if (cs) {
-      cs.textContent = (ovr.work.size || ovr.rest.size)
-        ? '上班 ' + ovr.work.size + ' · 休息 ' + ovr.rest.size
-        : '';
-    }
-
-    var s = monthStats(y, m, parsed);
-    // 翻到别的月份时，「剩余/总数」这个说法就不成立了，换成该月总数
-    var isCurMonth = (y === TODAY.getFullYear() && (m - 1) === TODAY.getMonth());
-    if (isCurMonth) {
-      $('s-ratio').textContent = s.left + '/' + s.total;
-      $('s-ratio-label').textContent = '本月工作日 · 剩余/总数';
-    } else {
-      $('s-ratio').textContent = String(s.total);
-      $('s-ratio-label').textContent = m + ' 月工作日总数 · ' + y + ' 年';
-    }
-    var ts = classify(TODAY_ISO, parsed);
-    $('s-today').textContent = ts.state === 'work' ? '上班' : '休息';
-    $('s-today').style.color = ts.state === 'work' ? 'var(--work-tx)' : 'var(--rest-tx)';
-    var tsl = $('s-today-label');
-    if (tsl) {
-      tsl.textContent = '今天 · ' + TODAY.getFullYear() + '年' + (TODAY.getMonth() + 1) + '月' +
-        TODAY.getDate() + '日';
-    }
-    var nh = nextHoliday(parsed, TODAY_ISO);
-    if (!nh && nyHol.off.size) {
-      nh = nextHoliday({ off: nyHol.off, mk: nyHol.mk, names: nyHol.names }, TODAY_ISO);
-    }
-    if (nh) {
-      // 合并当年与次年数据，数出到假期前还剩几个工作日
-      var merged = {
-        off: new Set(Array.from(parsed.off).concat(Array.from(nyHol.off))),
-        mk: new Set(Array.from(parsed.mk).concat(Array.from(nyHol.mk))),
-        names: Object.assign({}, parsed.names, nyHol.names)
-      };
-      var workLeft = 0;
-      var cursor = new Date(TODAY_ISO + 'T00:00:00');
-      var stop = new Date(nh.start + 'T00:00:00');
-      while (cursor < stop) {
-        if (classify(iso(cursor), merged).state === 'work') { workLeft++; }
-        cursor = new Date(cursor.getTime() + 86400000);
-      }
-      var holLabel = nh.name ? ('距离' + nh.name) : '距离下个节假日';
-      $('s-holiday').textContent = '';
-      var hNum = document.createElement('span');
-      hNum.textContent = nh.days;
-      var hUnit = document.createElement('i');
-      hUnit.className = 'unit';
-      hUnit.textContent = '天';
-      $('s-holiday').appendChild(hNum);
-      $('s-holiday').appendChild(hUnit);
-      $('s-holiday-label').textContent = holLabel + ' · 还需上 ' + workLeft + ' 个工作日';
-    } else {
-      $('s-holiday').textContent = '–';
-      $('s-holiday-label').textContent = '距离下个节假日';
-    }
-
-    var b = $('banner');
-    if (parsed.err) { b.className = 'banner show'; b.textContent = parsed.err; }
-    else if (y !== dataYear) {
-      b.className = 'banner show';
-      b.textContent = '正在查看 ' + y + ' 年，但载入的放假数据是 ' + dataYear + ' 年的，这个月只按周末和你的标记算。';
-    } else { b.className = 'banner'; }
-  }
-
-  function cycle(dateStr) {
-    var parsed = parseYearText(holText);
-    var nat = naturalState(dateStr, parsed);
-    // 当前是否已经是一个「有意义的自定义标记」（有效状态与自然相反）
-    var isMeaningful = classify(dateStr, parsed).kind.indexOf('custom') === 0;
-    ovr.work.delete(dateStr);
-    ovr.rest.delete(dateStr);
-    if (!isMeaningful) {
-      // 打上与自然相反的有效标记；天然休息只能改上班，天然上班只能改休息
-      if (nat === 'work') { ovr.rest.add(dateStr); }
-      else { ovr.work.add(dateStr); }
-    }
-    // 已是有效标记 → 清除，回到自然状态
-    $('customText').value = customTextFromOvr();
-    render();
-  }
-
-  /* ---------------- 接口通信 ---------------- */
-  function readHassTokens() {
-    try {
-      var raw = localStorage.getItem('hassTokens');
-      return raw ? JSON.parse(raw) : null;
-    } catch (e) { return null; }
-  }
-  function baseURL() {
-    // 真机页面与 HA 同源，直接用当前地址；hassUrl 可能是内网地址，不能拿它发请求
-    if (location.protocol === 'http:' || location.protocol === 'https:') {
-      return location.origin;
-    }
-    var t = readHassTokens();
-    return t && t.hassUrl ? String(t.hassUrl).replace(/\/+$/, '') : '';
-  }
-
-  // 同源页面直接借用登录态；过期就用 refresh_token 续一次
-  function resolveToken() {
-    var nowSec = Math.floor(Date.now() / 1000);
-    if (autoToken && autoTokenExp > nowSec + 30) {
-      return Promise.resolve(autoToken);
-    }
-    autoToken = null;
-    var t = readHassTokens();
-    if (!t || !t.access_token) { return Promise.resolve(null); }
-    if (!t.expires || Number(t.expires) > nowSec + 60) {
-      autoToken = t.access_token;
-      autoTokenExp = Number(t.expires) || (nowSec + 1800);
-      return Promise.resolve(autoToken);
-    }
-    if (!t.refresh_token) { return Promise.resolve(null); }
-    var body = new URLSearchParams({
-      grant_type: 'refresh_token',
-      refresh_token: t.refresh_token,
-      client_id: t.clientId || ''
-    });
-    return fetch(baseURL() + '/auth/token', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: body.toString()
-    }).then(function (r) {
-      if (!r.ok) { return null; }
-      return r.json().then(function (j) {
-        if (!j || !j.access_token) { return null; }
-        autoToken = j.access_token;
-        autoTokenExp = nowSec + (Number(j.expires_in) || 1800);
-        return autoToken;
-      });
-    }).catch(function () { return null; });
-  }
-
-  function api(path, opt, retried) {
-    return resolveToken().then(function (token) {
-      if (!token) { throw new Error('未连接到 Home Assistant'); }
-      opt = opt || {};
-      // 新 token 必须盖掉重试时带过来的旧 header
-      opt.headers = Object.assign({}, opt.headers || {}, {
-        'Authorization': 'Bearer ' + token,
-        'Content-Type': 'application/json'
-      });
-      return fetch(baseURL() + path, opt).then(function (r) {
-        if (r.status === 401 && !retried) {
-          autoToken = null;
-          autoTokenExp = 0;
-          return api(path, opt, true);          // 清掉缓存后重试一次
-        }
-        if (!r.ok) {
-          return r.text().then(function (tt) {
-            throw new Error('请求失败 ' + r.status + (tt ? '：' + tt.slice(0, 140) : ''));
-          });
-        }
-        var ct = r.headers.get('content-type') || '';
-        return r.text().then(function (txt) {
-          if (!txt) { return null; }          // 服务调用常是 200 + 空 body
-          if (ct.indexOf('json') >= 0) {
-            try { return JSON.parse(txt); } catch (e) { return txt; }
-          }
-          return txt;
-        });
-      });
-    });
-  }
-  function callService(service, data, wantResponse) {
-    var path = '/api/services/my_workday/' + service +
-      (wantResponse ? '?return_response=true' : '');
-    return api(path, {
-      method: 'POST',
-      body: JSON.stringify(data)
-    });
-  }
-  function say(text, type) {
-    var el = $('msg');
-    el.textContent = text;
-    el.className = 'msg' + (type ? ' ' + type : '');
-  }
-
-  function loadFromHA(rethrow) {
-    return api('/api/states/' + ENTITY_LEFT).then(function (st) {
-      dataYear = TODAY.getFullYear();
-      var a = st.attributes || {};
-      holText = a.year_data_text || '';
-      var nextParsed = parseYearText(a.next_year_data_text || '');
-      nyHol.off = nextParsed.off;
-      nyHol.mk = nextParsed.mk;
-      nyHol.names = nextParsed.names;
-      dataSourceLabel = a.holiday_data_source === 'manual' ? '你粘贴的数据'
-                      : a.holiday_data_source === 'network' ? 'holiday-cn 自动获取'
-                      : '未获取到';
-      ovr.work = new Set(a.custom_work || []);
-      ovr.rest = new Set(a.custom_rest || []);
-      $('customText').value = customTextFromOvr();
-      annivs = (a.anniversaries || []).map(function (it) {
-        return { name: it.name, date: it.date, repeat: !!it.repeat };
-      });
-      renderAnnivs();
-      todos = (a.todos || []).map(function (it) {
-        return { date: it.date, text: it.text, done: !!it.done };
-      });
-      renderTodos();
+  function load() {
+    if (busy || !M.isHA()) return Promise.resolve();
+    busy = true;
+    return M.snapshot().then(function (d) {
+      if (!d || !d.workday) throw new Error('快照数据为空');
+      S = d;
+      var t = M.dateOf(d.today);
+      if (year === undefined) { year = t.getFullYear(); month = t.getMonth() + 1; }
       render();
-      say('已读取（' + dataSourceLabel + '）：上班 ' + ovr.work.size +
-          ' 天、休息 ' + ovr.rest.size + ' 天。', 'ok');
-    }).catch(function (e) {
-      if (rethrow) {                          // 保存 / 刷新必须知道失败，不能报成成功
-        say('读取失败 —— ' + e.message, 'err');
-        throw e;
-      }
+    }).catch(function (e) { M.toast(e.message, true); })
+      .finally(function () { busy = false; });
+  }
+  function write(service, data) {
+    return M.call(service, data).then(load).catch(function (e) { M.toast(e.message, true); });
+  }
+  function iso(d) {
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  }
+  function classify(day) {
+    var w = S.workday, h = S.holidays || {}, key = iso(day);
+    if ((w.custom_rest || []).indexOf(key) >= 0) return { work: false, label: '休' };
+    if ((w.custom_work || []).indexOf(key) >= 0) return { work: true, label: '班' };
+    if ((h.makeup || []).indexOf(key) >= 0) return { work: true, label: '补班' };
+    if ((h.off || []).indexOf(key) >= 0) return { work: false, label: (h.names || {})[key] || '放假' };
+    var g = day.getDay();
+    return { work: g >= 1 && g <= 5, label: '' };
+  }
+  function renderStats() {
+    var w = S.workday, st = w.stats || {}, hol = w.next_holiday || {};
+    $('dateLabel').textContent = '今天 · ' + S.today;
+    var left = st.left == null ? '—' : st.left;
+    var total = st.total == null ? '—' : st.total;
+    var third = hol.name
+      ? '<div class="num orange">' + (hol.days == null ? '—' : hol.days) + ' 天</div><div class="lbl">距' + M.esc(hol.name) + '</div>'
+      : '<div class="num red">' + S.maintenance.due_total + ' 项</div><div class="lbl">维护已到期</div>';
+    $('stats').innerHTML =
+      '<div class="stat"><div class="num blue">' + left + ' / ' + total + '</div><div class="lbl">本月工作日 · 剩余/总数</div></div>' +
+      '<div class="stat"><div class="num">' + (w.today_work ? '上班' : '休息') + '</div><div class="lbl">今天 · ' + M.esc(w.today_label || '') + '</div></div>' +
+      '<div class="stat">' + third + '</div>';
+    var badge = $('dueBadge');
+    badge.hidden = !S.maintenance.due_total;
+    badge.textContent = S.maintenance.due_total;
+    $('sourceLabel').textContent = '放假数据：' +
+      ({ network: 'holiday-cn 自动获取', manual: '手工覆盖', fallback: '未获取到，按周末规则降级' }[w.holiday_source] || '未获取到');
+  }
+  function renderCal() {
+    $('calTitle').textContent = year + ' 年 ' + month + ' 月';
+    $('calHead').innerHTML = ['一', '二', '三', '四', '五', '六', '日']
+      .map(function (d) { return '<div>' + d + '</div>'; }).join('');
+    var first = new Date(year, month - 1, 1);
+    var offset = (first.getDay() + 6) % 7;
+    var start = new Date(year, month - 1, 1 - offset);
+    var todos = {}, due = {};
+    (S.workday.todos || []).forEach(function (t) {
+      if (!t.done) todos[t.date] = (todos[t.date] || 0) + 1;
     });
-  }
-
-  // 是否处于真实 HA 环境（可实时写入）；预览 / 演示不写
-  function liveHA() {
-    return !P.get('demo') && !!readHassTokens();
-  }
-  // 把文本框里的自定义标记提交给 HA（返回 promise，供实时写入用）
-  function pushCustom() {
-    var parsed = parseCustomText($('customText').value);
-    return callService('set_custom', {
-      work: parsed.work.join(','),
-      rest: parsed.rest.join(',')
+    (S.maintenance.due_items || []).forEach(function (d) {
+      due[d.due_date] = (due[d.due_date] || 0) + 1;
     });
-  }
-  // 防抖实时写入：点格子 / 文本框修改后自动落盘，无需再点保存
-  var persistTimer = null;
-  function persistNow() {
-    if (persistTimer) { clearTimeout(persistTimer); }
-    persistTimer = setTimeout(function () {
-      pushCustom().catch(function (e) { say('自动保存失败 —— ' + e.message, 'err'); });
-    }, 350);
-  }
-
-  /* ---------------- 纪念日 ---------------- */
-  var annivs = [];                       // [{name, date, repeat}]
-
-  function annivDaysOf(it) {
-    var base = new Date(TODAY.getFullYear(), TODAY.getMonth(), TODAY.getDate());
-    var cand;
-    if (it.repeat) {
-      var mm = +it.date.slice(0, 2), dd = +it.date.slice(3, 5);
-      cand = new Date(base.getFullYear(), mm - 1, dd);
-      if (cand < base) { cand = new Date(base.getFullYear() + 1, mm - 1, dd); }
-    } else {
-      var p = it.date.split('-');
-      cand = new Date(+p[0], +p[1] - 1, +p[2]);
+    var html = '';
+    for (var i = 0; i < 42; i++) {
+      var day = new Date(start); day.setDate(start.getDate() + i);
+      var key = iso(day), c = classify(day);
+      var cls = 'cell ' + (c.work ? 'work' : 'rest') +
+        (day.getMonth() + 1 !== month || day.getFullYear() !== year ? ' out' : '') +
+        (key === S.today ? ' today' : '');
+      var marks = '';
+      if (todos[key]) marks += '<span class="mark todo">' + todos[key] + '</span>';
+      if (due[key]) marks += '<span class="mark">' + due[key] + '</span>';
+      html += '<div class="' + cls + '" data-iso="' + key + '"><span class="d">' + day.getDate() + '</span>' +
+        (c.label ? '<span class="lbl">' + M.esc(c.label) + '</span>' : '') +
+        '<span class="marks">' + marks + '</span></div>';
     }
-    return Math.round((cand - base) / 86400000);
+    $('cal').innerHTML = html;
   }
-
-  function renderAnnivs() {
-    var ul = $('annivList');
-    if (!ul) { return; }
-    var sumEl = $('annivSum');
-    if (sumEl) { sumEl.textContent = annivs.length ? annivs.length + ' 个' : ''; }
-    ul.innerHTML = '';
-    if (!annivs.length) {
-      var empty = document.createElement('li');
-      empty.className = 'empty';
-      empty.textContent = '还没有纪念日，点右上角「+ 新增」添加。';
-      ul.appendChild(empty);
-      return;
-    }
-    var rows = annivs.map(function (it, i) {
-      return { it: it, i: i, days: annivDaysOf(it) };
-    }).sort(function (a, b) { return a.days - b.days; });
-    rows.forEach(function (r) {
-      var li = document.createElement('li');
-      if (r.days === 0) { li.className = 'today'; }
-      var name = document.createElement('span'); name.className = 'an-name'; name.textContent = r.it.name;
-      var dt = document.createElement('span'); dt.className = 'an-date';
-      dt.textContent = r.it.date + (r.it.repeat ? '（每年）' : '');
-      var left = document.createElement('span'); left.className = 'an-left';
-      left.textContent = r.days === 0 ? '就是今天' : (r.days === 1 ? '明天' : '还有 ' + r.days + ' 天');
-      var del = document.createElement('button');
-      del.type = 'button'; del.className = 'an-del'; del.textContent = '×'; del.title = '删除';
-      del.onclick = function () { deleteAnniv(r.i); };
-      li.appendChild(name); li.appendChild(dt); li.appendChild(left); li.appendChild(del);
-      ul.appendChild(li);
-    });
-  }
-
-  function annivText() {
-    return annivs.map(function (it) { return it.name + ': ' + it.date; }).join('\n');
-  }
-  function pushAnniversaries() {
-    return callService('set_anniversaries', { data: annivText() });
-  }
-  var annivTimer = null;
-  function persistAnnivs() {
-    if (annivTimer) { clearTimeout(annivTimer); }
-    annivTimer = setTimeout(function () {
-      pushAnniversaries().catch(function (e) { say('纪念日保存失败 —— ' + e.message, 'err'); });
-    }, 350);
-  }
-  function saveAnnivList() {
-    renderAnnivs();
-    render();                            // 格子上小圆点跟着变
-    if (liveHA()) { persistAnnivs(); }
-  }
-  function deleteAnniv(index) {
-    annivs.splice(index, 1);
-    saveAnnivList();
-  }
-  function openAnnivForm() {
-    if (!foldState.anniv) { foldState.anniv = true; syncFold('anniv'); saveFold(); }
-    $('annivName').value = '';
-    $('annivDate').value = iso(new Date(TODAY.getFullYear(), TODAY.getMonth(), TODAY.getDate()));
-    $('annivRepeat').checked = true;
-    $('annivForm').classList.add('show');
-    $('annivName').focus();
-  }
-  function closeAnnivForm() {
-    $('annivForm').classList.remove('show');
-  }
-  function toggleAnnivForm() {               // 「+ 新增」再点一次 = 收起表单
-    if ($('annivForm').classList.contains('show')) { closeAnnivForm(); } else { openAnnivForm(); }
-  }
-  function submitAnniv() {
-    var name = $('annivName').value.trim();
-    var raw = $('annivDate').value;          // input[type=date] 给 YYYY-MM-DD
-    var repeat = $('annivRepeat').checked;
-    if (!name) { say('请填写纪念日名称。', 'err'); $('annivName').focus(); return; }
-    if (!raw || raw.length !== 10) { say('请选择日期。', 'err'); return; }
-    if (!tryAddAnniv(name, raw, repeat)) { return; }
-    closeAnnivForm();
-    say('已添加「' + name + '」。', 'ok');
-  }
-
-  /* ---------------- 待办 ---------------- */
-  function dayItemsOf(todoList, annivList, dateStr) {
-    var out = [], i, mmdd = dateStr.slice(5);
-    for (i = 0; i < (todoList || []).length; i++) {
-      if (todoList[i].date === dateStr) { out.push({ kind: 'todo', ref: todoList[i] }); }
-    }
-    for (i = 0; i < (annivList || []).length; i++) {
-      var a = annivList[i];
-      if (a.repeat ? a.date === mmdd : a.date === dateStr) {
-        out.push({ kind: 'anniv', ref: a });
-      }
-    }
-    return out;
-  }
-  function dayMarksOf(todoList, annivList, dateStr) {
-    var items = dayItemsOf(todoList, annivList, dateStr), t = false, a = false;
-    for (var i = 0; i < items.length; i++) {
-      if (items[i].kind === 'todo') { t = true; } else { a = true; }
-    }
-    return { todo: t, anniv: a };
-  }
-  function dayMarks(dateStr) { return dayMarksOf(todos, annivs, dateStr); }
-  function dotOf(cls) {
-    var i = document.createElement('i');
-    i.className = cls;
-    i.textContent = cls === 't' ? '待' : '纪';
-    i.title = cls === 't' ? '有待办' : '有纪念日';
-    return i;
-  }
-
-  function todoTextOf(list) {
-    return (list || []).map(function (t) {
-      return (t.done ? '[x] ' : '[ ] ') + t.date + ' ' + t.text;
-    }).join('\n');
-  }
-  function pushTodos() { return callService('set_todos', { data: todoTextOf(todos) }); }
-  var todoTimer = null;
-  function persistTodos() {
-    if (todoTimer) { clearTimeout(todoTimer); }
-    todoTimer = setTimeout(function () {
-      pushTodos().catch(function (e) { say('待办保存失败 —— ' + e.message, 'err'); });
-    }, 350);
-  }
-  function saveTodos() {
-    renderTodos();
-    render();
-    if (liveHA()) { persistTodos(); }
-  }
-  function deleteTodo(t) {
-    var i = todos.indexOf(t);
-    if (i >= 0) { todos.splice(i, 1); saveTodos(); }
-  }
-  /* 待办分组：逾期 / 今天 / 未来 7 天 / 以后 / 已完成 */
-  var TODO_GROUPS = [
-    { key: 'late', label: '逾期' },
-    { key: 'today', label: '今天' },
-    { key: 'week', label: '未来 7 天' },
-    { key: 'later', label: '以后' },
-    { key: 'done', label: '已完成' }
-  ];
-  var WD = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
-
-  function dayGap(fromISO, toISO) {          // to - from，按天算
-    return Math.round((new Date(toISO + 'T00:00:00') - new Date(fromISO + 'T00:00:00')) / 86400000);
-  }
-  function todoGroupKey(t) {
-    if (t.done) { return 'done'; }
-    var gap = dayGap(TODAY_ISO, t.date);
-    if (gap < 0) { return 'late'; }
-    if (gap === 0) { return 'today'; }
-    if (gap <= 6) { return 'week'; }
-    return 'later';
-  }
-  function relDayLabel(dateStr) {            // 行右侧的「今天 / 明天 / 逾期 3 天 / 11-27」
-    var gap = dayGap(TODAY_ISO, dateStr);
-    if (gap < 0) { return '逾期 ' + (-gap) + ' 天'; }
-    if (gap === 0) { return '今天'; }
-    if (gap === 1) { return '明天'; }
-    if (gap === 2) { return '后天'; }
-    if (gap <= 6) { return WD[new Date(dateStr + 'T00:00:00').getDay()]; }
-    if (dateStr.slice(0, 4) === TODAY_ISO.slice(0, 4)) { return dateStr.slice(5); }
-    return dateStr;
-  }
-  function openTodosOf(dateStr) {            // 当天未完成待办，给格子里的摘要用
-    return todos.filter(function (t) { return t.date === dateStr && !t.done; });
-  }
-  function byDateAsc(a, b) { return a.date < b.date ? -1 : (a.date > b.date ? 1 : 0); }
-  function byDateDesc(a, b) { return a.date > b.date ? -1 : (a.date < b.date ? 1 : 0); }
-
-  function todoRow(t) {
-    var li = document.createElement('li');
-    if (t.done) { li.className = 'done'; }
-    else if (t.date < TODAY_ISO) { li.className = 'overdue'; }
-    else if (t.date === TODAY_ISO) { li.className = 'today'; }
-    var cb = document.createElement('input');
-    cb.type = 'checkbox';
-    cb.className = 'td-cb';
-    cb.checked = !!t.done;
-    cb.title = t.done ? '标记为未完成' : '标记为完成';
-    cb.onchange = function () {
-      t.done = cb.checked;
-      if (cb.checked) { say('完成：' + t.text, 'ok'); }
-      saveTodos();
-    };
-    var nameEl = document.createElement('span');
-    nameEl.className = 'an-name';
-    nameEl.textContent = t.text;
-    var rel = document.createElement('span');
-    rel.className = 'td-rel';
-    rel.textContent = relDayLabel(t.date);
-    rel.title = t.date + ' ' + WD[new Date(t.date + 'T00:00:00').getDay()];
-    var del = document.createElement('button');
-    del.type = 'button'; del.className = 'an-del'; del.textContent = '×'; del.title = '删除';
-    del.onclick = function () { deleteTodo(t); };
-    li.appendChild(cb); li.appendChild(nameEl); li.appendChild(rel); li.appendChild(del);
-    return li;
-  }
-
   function renderTodos() {
-    var ul = $('todoList');
-    if (!ul) { return; }
-    var openCnt = todos.filter(function (t) { return !t.done; }).length;
-    var sumEl = $('todoSum');
-    if (sumEl) {
-      sumEl.textContent = openCnt ? ('未完成 ' + openCnt) : (todos.length ? '全部完成' : '');
-    }
-    ul.innerHTML = '';
-    if (!todos.length) {
-      var empty = document.createElement('li');
-      empty.className = 'empty';
-      empty.textContent = '还没有待办。在日历格子上右键或长按即可添加。';
-      ul.appendChild(empty);
-      return;
-    }
-    var bucket = { late: [], today: [], week: [], later: [], done: [] };
-    todos.forEach(function (t) { bucket[todoGroupKey(t)].push(t); });
-    bucket.late.sort(byDateAsc);
-    bucket.today.sort(byDateAsc);
-    bucket.week.sort(byDateAsc);
-    bucket.later.sort(byDateAsc);
-    bucket.done.sort(byDateDesc);            // 最近完成的排在上
-
-    TODO_GROUPS.forEach(function (g) {
-      var list = bucket[g.key];
-      if (!list.length) { return; }
-      var head = document.createElement('li');
-      head.className = 'td-grp' + (g.key === 'late' ? ' late' : '');
-      head.appendChild(elOf('span', null, g.label));
-      head.appendChild(elOf('span', 'g-n', '· ' + list.length));
-      if (g.key === 'done') {
-        var tg = elOf('button', 'g-tg', doneOpen ? '收起' : '展开');
-        tg.type = 'button';
-        head.appendChild(tg);
-        head.addEventListener('click', function () { doneOpen = !doneOpen; renderTodos(); });
-        ul.appendChild(head);
-        if (!doneOpen) { return; }
-      } else {
-        ul.appendChild(head);
-      }
-      list.forEach(function (t) { ul.appendChild(todoRow(t)); });
+    var list = (S.workday.todos || []).slice().sort(function (a, b) { return a.date.localeCompare(b.date); });
+    var groups = [['逾期', ''], ['今天', ''], ['未来 7 天', ''], ['以后', ''], ['已完成', '']];
+    var buckets = [[], [], [], [], []];
+    list.forEach(function (t) {
+      if (t.done) { buckets[4].push(t); return; }
+      var d = M.dayDiff(t.date, S.today);
+      if (d < 0) buckets[0].push(t);
+      else if (d === 0) buckets[1].push(t);
+      else if (d <= 7) buckets[2].push(t);
+      else buckets[3].push(t);
     });
-  }
-  function openTodoForm() {                 // 卡片里的「+ 新增」：自己挑日期
-    if (!foldState.todo) { foldState.todo = true; syncFold('todo'); saveFold(); }
-    $('todoText').value = '';
-    $('todoDate').value = TODAY_ISO;
-    $('todoForm').classList.add('show');
-    $('todoText').focus();
-  }
-  function closeTodoForm() {
-    $('todoForm').classList.remove('show');
-  }
-  function toggleTodoForm() {                // 「+ 新增」再点一次 = 收起表单
-    if ($('todoForm').classList.contains('show')) { closeTodoForm(); } else { openTodoForm(); }
-  }
-  function submitTodo() {
-    var text = $('todoText').value.trim();
-    var d = $('todoDate').value;
-    if (!text) { say('请填写待办内容。', 'err'); $('todoText').focus(); return; }
-    if (!d || d.length !== 10) { say('请选择日期。', 'err'); return; }
-    todos.push({ date: d, text: text.slice(0, 60), done: false });
-    closeTodoForm();
-    saveTodos();
-    say('已添加待办：' + d + ' ' + text, 'ok');
-  }
-
-  /* ---------------- 右键 / 长按菜单 ---------------- */
-  function elOf(tag, cls, txt) {
-    var x = document.createElement(tag);
-    if (cls) { x.className = cls; }
-    if (txt != null) { x.textContent = txt; }
-    return x;
-  }
-  function ctxOpen(x, y, dateStr) {
-    var box = $('ctx');
-    if (!box) { return; }
-    ctxDate = dateStr;
-    ctxMode = 'menu';
-    ctxAnchor = { x: x, y: y };
-    ctxRender();
-    box.classList.add('show');
-    ctxPlace(x, y);
-  }
-  function ctxPlace(x, y) {
-    var box = $('ctx');
-    if (!box) { return; }
-    box.style.left = '8px';
-    box.style.top = '8px';
-    var w = box.offsetWidth, h = box.offsetHeight;
-    // 手机弹出键盘时 window.innerHeight 不变、visualViewport 才变，用小的那个算，别让菜单掉到键盘后面
-    var vw = window.innerWidth, vh = window.innerHeight;
-    if (window.visualViewport) {
-      vw = Math.min(vw, window.visualViewport.width);
-      vh = Math.min(vh, window.visualViewport.height);
-    }
-    var left = Math.min(x, vw - w - 10);
-    var top = Math.min(y, vh - h - 10);
-    box.style.left = Math.max(8, left) + 'px';
-    box.style.top = Math.max(8, top) + 'px';
-  }
-  function ctxKeepInView() {                 // 视口变化（键盘弹出、旋转）只挪位置，不关菜单
-    var box = $('ctx');
-    if (!box || !box.classList.contains('show') || !ctxAnchor) { return; }
-    ctxPlace(ctxAnchor.x, ctxAnchor.y);
-  }
-  function ctxHide() {
-    var box = $('ctx');
-    ctxDate = null;
-    ctxMode = 'menu';
-    ctxTodo = null;
-    ctxAnniv = null;
-    ctxNewType = null;
-    ctxAnchor = null;
-    if (!box) { return; }
-    box.classList.remove('show');
-    box.innerHTML = '';
-  }
-  function ctxRender() {
-    var box = $('ctx');
-    if (!box || !ctxDate) { return; }
-    box.innerHTML = '';
-    if (ctxMode === 'menu') { ctxMenu(box); }
-    else if (ctxMode === 'new') { ctxNewPick(box); }
-    else if (ctxMode === 'todoedit') { ctxTodoEditForm(box); }
-    else if (ctxMode === 'annivedit') { ctxAnnivEditForm(box); }
-    var r = box.getBoundingClientRect();
-    if (r.right > window.innerWidth - 8) {
-      box.style.left = Math.max(8, window.innerWidth - r.width - 10) + 'px';
-    }
-    if (r.bottom > window.innerHeight - 8) {
-      box.style.top = Math.max(8, window.innerHeight - r.height - 10) + 'px';
-    }
-  }
-  function dayTodosOf(dateStr) {
-    return todos.filter(function (t) { return t.date === dateStr; });
-  }
-  function ctxMenu(box) {
-    ctxItemRows(box);                      // 当天的待办 + 纪念日直接列在菜单里
-    var add = elOf('button', 'ctx-item ctx-add', '＋ 新增');
-    add.type = 'button';
-    add.onclick = function () { ctxMode = 'new'; ctxRender(); };
-    box.appendChild(add);
-  }
-  function dayAnnivsOf(dateStr) {
-    return dayItemsOf([], annivs, dateStr).filter(function (it) { return it.kind === 'anniv'; })
-      .map(function (it) { return it.ref; });
-  }
-  function ctxItemRows(box) {             // 菜单里的当日条目：待办（可完成）+ 纪念日（可删）
-    var dayTodos = dayTodosOf(ctxDate);
-    var dayAnns = dayAnnivsOf(ctxDate);
-    if (!dayTodos.length && !dayAnns.length) { return; }
-    var wrap = elOf('div', 'ctx-todos');
-    dayTodos.forEach(function (t) {
-      var row = elOf('div', 'ct-row' + (t.done ? ' done' : ''));
-      var txt = elOf('span', 'ct-text', t.text);
-      txt.title = t.text + '（左右滑动看全文）';
-      txt.onclick = function () {          // 点文字 = 改这条待办
-        ctxTodo = t;
-        ctxMode = 'todoedit';
-        ctxRender();
-        focusTodoEdit();
-      };
-      var dn = elOf('button', 'ct-done', t.done ? '撤销' : '完成');
-      dn.type = 'button';
-      dn.title = t.done ? '恢复成未完成' : '标记完成';
-      dn.onclick = function () {
-        t.done = !t.done;
-        row.classList.toggle('done', !!t.done);
-        dn.textContent = t.done ? '撤销' : '完成';
-        dn.title = t.done ? '恢复成未完成' : '标记完成';
-        saveTodos();
-        say((t.done ? '已完成：' : '已恢复未完成：') + t.date + ' ' + t.text, 'ok');
-      };
-      var del = elOf('button', 'ct-del', '×');
-      del.type = 'button';
-      del.title = '删除这条待办';
-      del.onclick = function () {
-        var i = todos.indexOf(t);
-        if (i >= 0) { todos.splice(i, 1); }
-        saveTodos();
-        ctxRender();                       // 重画菜单，这一行就消失了
-      };
-      row.appendChild(elOf('span', 'ct-tag t', '待'));
-      row.appendChild(txt);
-      row.appendChild(dn);
-      row.appendChild(del);
-      wrap.appendChild(row);
-    });
-    dayAnns.forEach(function (a) {
-      var row = elOf('div', 'ct-row');
-      var txt = elOf('span', 'ct-text', a.name);
-      txt.title = a.name + ' · ' + a.date + (a.repeat ? '（每年重复）' : '') + '　点文字可修改';
-      txt.onclick = function () {          // 点文字 = 改这个纪念日
-        ctxAnniv = a;
-        ctxMode = 'annivedit';
-        ctxRender();
-        focusAnnivEdit();
-      };
-      var del = elOf('button', 'ct-del', '×');
-      del.type = 'button';
-      del.title = '删除这个纪念日';
-      del.onclick = function () {
-        var i = annivs.indexOf(a);
-        if (i >= 0) { annivs.splice(i, 1); }
-        saveAnnivList();
-        ctxRender();
-        say('已删除纪念日：' + a.name, 'ok');
-      };
-      row.appendChild(elOf('span', 'ct-tag a', '纪'));
-      row.appendChild(txt);
-      row.appendChild(del);
-      wrap.appendChild(row);
-    });
-    box.appendChild(wrap);
-  }
-  function ctxNewPick(box) {                // 新增：先选类型，再输入内容，回车保存
-    box.appendChild(elOf('div', 'ctx-title', '新增什么？'));
-    var row = elOf('div', 'ctx-type');
-    var bTodo = elOf('button', 'ctx-type-btn', '待办');
-    var bAnn = elOf('button', 'ctx-type-btn', '纪念日');
-    bTodo.type = 'button';
-    bAnn.type = 'button';
-    var inRow = elOf('div', 'ctx-row');
-    var inp = document.createElement('input');
-    inp.type = 'text'; inp.id = 'ctxNewText'; inp.maxLength = 60;
-    inp.onkeydown = function (e) {
-      if (e.key === 'Enter') { ctxSaveNew(); }
-      else if (e.key === 'Escape') { ctxHide(); }
-    };
-    inRow.appendChild(inp);
-    var repRow = elOf('div', 'ctx-row ctx-rep');
-    var lb = elOf('label', 'anniv-rep');
-    var cb = document.createElement('input');
-    cb.type = 'checkbox'; cb.id = 'ctxNewRepeat'; cb.checked = true;
-    lb.appendChild(cb);
-    lb.appendChild(document.createTextNode(' 每年重复（只记月日）'));
-    repRow.appendChild(lb);
-
-    function setType(t) {
-      ctxNewType = t;
-      bTodo.classList.toggle('on', t === 'todo');
-      bAnn.classList.toggle('on', t === 'anniv');
-      inp.placeholder = t === 'anniv' ? '名称，如 生日' : (t === 'todo' ? '要做什么' : '先选类型，再写内容');
-      repRow.style.display = t === 'anniv' ? 'flex' : 'none';
-      inp.focus();
-    }
-    bTodo.onclick = function () { setType(ctxNewType === 'todo' ? null : 'todo'); };
-    bAnn.onclick = function () { setType(ctxNewType === 'anniv' ? null : 'anniv'); };
-    row.appendChild(bTodo);
-    row.appendChild(bAnn);
-    box.appendChild(row);
-    box.appendChild(inRow);
-    box.appendChild(repRow);
-    setType(null);
-  }
-  function ctxSaveNew() {
-    var inp = $('ctxNewText');
-    if (!inp) { return; }
-    var text = inp.value.trim();
-    if (!ctxNewType) { say('先选「待办」还是「纪念日」。', 'err'); inp.focus(); return; }
-    if (!text) { say('内容不能为空。', 'err'); inp.focus(); return; }
-    var d = ctxDate;
-    if (ctxNewType === 'todo') {
-      todos.push({ date: d, text: text.slice(0, 60), done: false });
-      ctxHide();
-      saveTodos();
-      say('已添加待办：' + d + ' ' + text, 'ok');
-    } else {
-      var cb = $('ctxNewRepeat');
-      var repeat = cb ? cb.checked : true;
-      ctxHide();
-      if (tryAddAnniv(text, d, repeat)) { say('已添加纪念日「' + text + '」。', 'ok'); }
-    }
-  }
-  function ctxActions(onSave, extra) {
-    var acts = elOf('div', 'ctx-actions');
-    if (extra) {                             // 编辑待办时多给一个「完成」按钮
-      var ex = elOf('button', null, extra.label);
-      ex.type = 'button';
-      ex.onclick = extra.onClick;
-      acts.appendChild(ex);
-    }
-    var ok = elOf('button', 'primary', '保存');
-    ok.type = 'button'; ok.onclick = onSave;
-    var no = elOf('button', null, '取消');
-    no.type = 'button'; no.onclick = ctxHide;
-    acts.appendChild(ok); acts.appendChild(no);
-    return acts;
-  }
-  function ctxTodoEditForm(box) {
-    if (!ctxTodo) { ctxMode = 'menu'; ctxRender(); return; }
-    var row = elOf('div', 'ctx-row');
-    var inp = document.createElement('input');
-    inp.type = 'text'; inp.id = 'ctxTodoText'; inp.maxLength = 60;
-    inp.value = ctxTodo.text;
-    inp.onkeydown = function (e) {
-      if (e.key === 'Enter') { ctxSaveTodoEdit(); }
-      else if (e.key === 'Escape') { ctxHide(); }
-    };
-    row.appendChild(inp);
-    box.appendChild(row);
-    box.appendChild(ctxActions(ctxSaveTodoEdit, {
-      label: ctxTodo.done ? '撤销完成' : '完成',
-      onClick: ctxToggleTodoDone
-    }));
-  }
-  function toggleTodoDone(t) {               // 待办列表行 / 编辑框共用的「完成」动作
-    if (!t) { return; }
-    t.done = !t.done;
-    var d = t.date, txt = t.text, done = t.done;
-    ctxHide();
-    saveTodos();
-    say((done ? '已完成：' : '已恢复未完成：') + d + ' ' + txt, 'ok');
-  }
-  function ctxToggleTodoDone() {
-    if (ctxTodo) { toggleTodoDone(ctxTodo); }
-  }
-  function ctxSaveTodoEdit() {
-    var inp = $('ctxTodoText');
-    if (!inp || !ctxTodo) { return; }
-    var text = inp.value.trim();
-    if (!text) { say('待办内容不能为空。', 'err'); inp.focus(); return; }
-    var d = ctxDate;
-    ctxTodo.text = text.slice(0, 60);
-    ctxHide();
-    saveTodos();
-    say('已更新待办：' + d + ' ' + text, 'ok');
-  }
-  function focusTodoEdit() {
-    var inp = $('ctxTodoText');
-    if (!inp) { return; }
-    inp.focus();
-    try { inp.setSelectionRange(inp.value.length, inp.value.length); } catch (e) {}
-  }
-  function tryAddAnniv(name, raw, repeat) {
-    var dateStr = repeat ? raw.slice(5) : raw;   // 每年重复只留 MM-DD
-    var dup = annivs.some(function (it) { return it.name === name && it.date === dateStr; });
-    if (dup) { say('已有相同的纪念日。', 'err'); return false; }
-    annivs.push({ name: name, date: dateStr, repeat: repeat });
-    saveAnnivList();
-    return true;
-  }
-  function isLeapYear(y) { return (y % 4 === 0 && y % 100 !== 0) || y % 400 === 0; }
-  function ctxAnnivEditForm(box) {        // 菜单里点纪念日文字 → 改名称/日期/是否每年重复
-    var a = ctxAnniv;
-    if (!a) { ctxMode = 'menu'; ctxRender(); return; }
-    var r1 = elOf('div', 'ctx-row');
-    var nm = document.createElement('input');
-    nm.type = 'text'; nm.id = 'ctxAnnivName'; nm.maxLength = 24; nm.value = a.name;
-    nm.onkeydown = function (e) { if (e.key === 'Enter') { ctxSaveAnnivEdit(); } };
-    r1.appendChild(nm);
-    box.appendChild(r1);
-
-    var r2 = elOf('div', 'ctx-row');
-    var dt = document.createElement('input');
-    dt.type = 'date'; dt.id = 'ctxAnnivDate';
-    if (a.repeat) {                         // 每年重复只存了月日，补一个完整日期给选择器
-      var y = TODAY.getFullYear();
-      if (a.date === '02-29' && !isLeapYear(y)) { y = y + 1; if (!isLeapYear(y)) { y = y + 1; } }
-      dt.value = y + '-' + a.date;
-    } else {
-      dt.value = a.date;
-    }
-    r2.appendChild(dt);
-    box.appendChild(r2);
-
-    var r3 = elOf('div', 'ctx-row');
-    var lb = elOf('label', 'anniv-rep');
-    var cb = document.createElement('input');
-    cb.type = 'checkbox'; cb.id = 'ctxAnnivRepeat'; cb.checked = !!a.repeat;
-    lb.appendChild(cb);
-    lb.appendChild(document.createTextNode(' 每年重复（只记月日）'));
-    r3.appendChild(lb);
-    box.appendChild(r3);
-
-    box.appendChild(ctxActions(ctxSaveAnnivEdit));
-  }
-  function ctxSaveAnnivEdit() {
-    var a = ctxAnniv;
-    var nm = $('ctxAnnivName'), dt = $('ctxAnnivDate'), cb = $('ctxAnnivRepeat');
-    if (!a || !nm || !dt || !cb) { return; }
-    var name = nm.value.trim();
-    if (!name) { say('请填写纪念日名称。', 'err'); nm.focus(); return; }
-    if (!dt.value || dt.value.length !== 10) { say('请选择日期。', 'err'); return; }
-    a.name = name;
-    a.repeat = cb.checked;
-    a.date = cb.checked ? dt.value.slice(5) : dt.value;
-    ctxHide();
-    saveAnnivList();
-    say('已更新纪念日「' + name + '」。', 'ok');
-  }
-  function focusAnnivEdit() {
-    var nm = $('ctxAnnivName');
-    if (!nm) { return; }
-    nm.focus();
-    try { nm.setSelectionRange(nm.value.length, nm.value.length); } catch (e) {}
-  }
-
-  /* ---------------- 自测 ---------------- */
-  function selfTest() {
-    var out = [];
-    // 自测固定基准日，避免跟着真实系统时钟漂移（期望值按 2026-11-10 推算）
-    TODAY = new Date('2026-11-10T00:00:00');
-    TODAY_ISO = iso(TODAY);
-    dataYear = 2026;
-    function chk(label, got, want) {
-      out.push((String(got) === String(want) ? 'PASS ' : 'FAIL ') + label + ' → ' + got +
-               (String(got) === String(want) ? '' : ' (want ' + want + ')'));
-    }
-    var t = '2026-01-01~2026-01-03 元旦放假\n2026-01-04 补班\n2026-02-15~2026-02-22 春节\n2026-02-14,2026-02-28 上班\n2026-10-01~2026-10-07 国庆';
-    var r = parseYearText(t);
-    chk('文本 放假天数', r.off.size, 3 + 8 + 7);
-    chk('文本 补班天数', r.mk.size, 3);
-    chk('补班含 2/14', r.mk.has('2026-02-14'), true);
-    chk('春节 2/17 是放假', r.off.has('2026-02-17'), true);
-
-    var j = JSON.stringify({ days: [{ date: '2026-01-01', isOffDay: true, name: '元旦' }] });
-    chk('JSON 解析', parseYearText(j).off.size, 1);
-
-    var c = parseCustomText('上班: 2026-11-28,2026-11-29\n休息: 2026-11-27');
-    chk('自定义 上班', c.work.length, 2);
-    chk('自定义 休息', c.rest.length, 1);
-
-    var hist = { off: r.off, mk: r.mk, names: r.names };
-    ovr.work = new Set(['2026-11-28', '2026-11-29']);
-    ovr.rest = new Set();
-    var s1 = monthStats(2026, 11, hist);
-    chk('11月总数(含2天周末上班)', s1.total, 23);
-    chk('11月剩余(2026-11-10)', s1.left, 17);
-
-    ovr.work = new Set();
-    ovr.rest = new Set(['2026-11-27']);
-    var s2 = monthStats(2026, 11, hist);
-    chk('11月总数(扣1天)', s2.total, 20);
-
-    var nh = nextHoliday(parseYearText(t), '2025-12-20');
-    chk('下一个假期是元旦', nh && nh.start, '2026-01-01');
-    chk('距元旦天数', nh && nh.days, 12);
-    chk('春节共 8 天', nh && nextHoliday(parseYearText(t), '2026-02-10').total_days, 8);
-    chk('11月无后续假期返回空', String(nextHoliday(parseYearText(t), '2026-11-10')), 'null');
-
-    // 自定义标记只在「与自然状态相反」时才打标识
-    ovr.work = new Set(); ovr.rest = new Set();
-    chk('周六天然休息', naturalState('2026-11-28', r), 'rest');
-    ovr.rest.add('2026-11-28');                       // 休息日强行标休息 = 冗余
-    chk('休息日标休息不打标识', classify('2026-11-28', r).kind, 'weekend');
-    ovr.rest.delete('2026-11-28'); ovr.work.add('2026-11-28');  // 休息日改上班 = 有效
-    chk('休息日改上班打标识', classify('2026-11-28', r).kind, 'custom-work');
-    chk('周一天然上班', naturalState('2026-11-30', r), 'work');
-    ovr.work.add('2026-11-30');                       // 工作日强行标上班 = 冗余
-    chk('工作日标上班不打标识', classify('2026-11-30', r).kind, 'weekday');
-    ovr.work.delete('2026-11-30'); ovr.rest.add('2026-11-30');  // 工作日改休息 = 有效
-    chk('工作日改休息打标识', classify('2026-11-30', r).kind, 'custom-rest');
-    // cycle 闭环：天然休息 → 点一次变上班 → 再点恢复
-    ovr.work = new Set(); ovr.rest = new Set();
-    cycle('2026-11-28');
-    chk('cycle 天然休息→改上班', classify('2026-11-28', r).kind, 'custom-work');
-    cycle('2026-11-28');
-    chk('cycle 再点→恢复自然(周末)', classify('2026-11-28', r).kind, 'weekend');
-    // 冗余导入标记应被 cycle 清理
-    ovr.work = new Set(); ovr.rest = new Set(['2026-11-28']);
-    cycle('2026-11-28');
-    chk('cycle 清理冗余休息标记', ovr.rest.has('2026-11-28'), false);
-
-    // 纪念日倒计时（基准日 2026-11-10）
-    chk('纪念日 每年已过→顺延明年', annivDaysOf({ name: 'x', date: '05-20', repeat: true }), 191);
-    chk('纪念日 一次性', annivDaysOf({ name: 'y', date: '2026-12-01', repeat: false }), 21);
-    chk('纪念日 就是今天', annivDaysOf({ name: 'z', date: '11-10', repeat: true }), 0);
-
-    // 待办 / 纪念日的当日归集与格子小圆点
-    var tl = [
-      { date: '2026-11-13', text: '交报告', done: false },
-      { date: '2026-11-13', text: '开会', done: true },
-      { date: '2026-11-20', text: '别的', done: false }
-    ];
-    var al = [
-      { name: '生日', date: '11-13', repeat: true },
-      { name: '上线', date: '2026-11-13', repeat: false }
-    ];
-    chk('待办文本首行', todoTextOf(tl).split('\n')[0], '[ ] 2026-11-13 交报告');
-    chk('待办已完成标记', todoTextOf(tl).split('\n')[1], '[x] 2026-11-13 开会');
-    chk('待办文本行数', todoTextOf(tl).split('\n').length, 3);
-    chk('当日条目数', dayItemsOf(tl, al, '2026-11-13').length, 4);
-    chk('每年纪念日跨年命中', dayItemsOf([], al, '2027-11-13').length, 1);
-    chk('一次性纪念日不跨年', dayItemsOf([], al, '2027-11-13')[0].ref.name, '生日');
-    chk('格子标记 只有待办', JSON.stringify(dayMarksOf(tl, al, '2026-11-20')),
-        '{"todo":true,"anniv":false}');
-    chk('格子标记 两者都有', JSON.stringify(dayMarksOf(tl, al, '2026-11-13')),
-        '{"todo":true,"anniv":true}');
-    // 待办分组与相对标签（基准日 2026-11-10，周二）
-    chk('分组 逾期', todoGroupKey({ date: '2026-11-09', done: false }), 'late');
-    chk('分组 今天', todoGroupKey({ date: '2026-11-10', done: false }), 'today');
-    chk('分组 未来7天', todoGroupKey({ date: '2026-11-16', done: false }), 'week');
-    chk('分组 以后', todoGroupKey({ date: '2026-11-17', done: false }), 'later');
-    chk('分组 已完成优先', todoGroupKey({ date: '2026-11-09', done: true }), 'done');
-    chk('标签 今天', relDayLabel('2026-11-10'), '今天');
-    chk('标签 明天', relDayLabel('2026-11-11'), '明天');
-    chk('标签 后天', relDayLabel('2026-11-12'), '后天');
-    chk('标签 逾期天数', relDayLabel('2026-11-07'), '逾期 3 天');
-    chk('标签 本周内用星期', relDayLabel('2026-11-16'), '周一');
-    chk('标签 更远用月日', relDayLabel('2026-11-27'), '11-27');
-    chk('标签 跨年带年份', relDayLabel('2027-01-05'), '2027-01-05');
-    todos = tl;
-    chk('格子摘要只含未完成', openTodosOf('2026-11-13').length, 1);
-    todos = [];
-
-    var pre = document.createElement('pre');
-    pre.id = 'selftest';
-    pre.textContent = out.join('\n');
-    document.body.appendChild(pre);
-    document.title = out.some(function (l) { return l.indexOf('FAIL') === 0; }) ? 'SELFTEST-FAIL' : 'SELFTEST-PASS';
-  }
-
-  /* ---------------- 启动 ---------------- */
-  function initSelects() {
-    var sy = $('selYear'), sm = $('selMonth');
-    var base = TODAY.getFullYear();
-    sy.innerHTML = '';
-    for (var y = base - 2; y <= base + 3; y++) {
-      var o = document.createElement('option');
-      o.value = String(y);
-      o.textContent = y + ' 年';
-      sy.appendChild(o);
-    }
-    sm.innerHTML = '';
-    for (var m = 1; m <= 12; m++) {
-      var o2 = document.createElement('option');
-      o2.value = String(m);
-      o2.textContent = m + ' 月';
-      sm.appendChild(o2);
-    }
-    sy.onchange = function () { view = new Date(+this.value, view.getMonth(), 1); render(); };
-    sm.onchange = function () { view = new Date(view.getFullYear(), +this.value - 1, 1); render(); };
-  }
-
-  function boot() {
-    view = new Date(TODAY.getFullYear(), TODAY.getMonth(), 1);
-    initSelects();
-
-    if (LOCAL && P.get('demo')) {
-      holText = '2026-01-01~2026-01-03 元旦放假\n2026-01-04 补班\n2026-02-15~2026-02-22 春节\n2026-02-14,2026-02-28 上班\n2026-04-04~2026-04-06 清明节\n2026-05-01~2026-05-05 劳动节\n2026-06-19~2026-06-21 端午节\n2026-09-19~2026-09-21 中秋节\n2026-10-01~2026-10-07 国庆\n2026-10-10 补班';
-      dataSourceLabel = '演示数据';
-      // 演示模式下补一段次年元旦数据，让倒计时也能看到效果
-      var demoNext = parseYearText('2027-01-01~2027-01-03 元旦放假\n2027-02-06 补班');
-      nyHol.off = demoNext.off;
-      nyHol.mk = demoNext.mk;
-      nyHol.names = demoNext.names;
-      nyHol.names['2027-01-01'] = '元旦';
-      ovr.work.add('2026-11-28');
-      ovr.rest.add('2026-11-27');
-      $('customText').value = customTextFromOvr();
-      annivs = [
-        { name: '生日', date: '05-20', repeat: true },
-        { name: '结婚纪念日', date: '10-01', repeat: true },
-        { name: '项目上线', date: '2026-12-01', repeat: false }
-      ];
-      renderAnnivs();
-      todos = [
-        { date: '2026-11-11', text: '交电费', done: false },
-        { date: '2026-11-13', text: '交月度报表', done: false },
-        { date: '2026-11-18', text: '部门例会', done: false },
-        { date: '2026-12-01', text: '项目验收材料', done: false },
-        { date: '2026-11-10', text: '提交巡检记录', done: true }
-      ];
-      renderTodos();
-    }
-
-    if (LOCAL && P.get('selftest')) { selfTest(); return; }
-
-    render();
-    if (LOCAL && P.get('demo')) {
-      say('演示数据，仅供预览。');
-    } else {
-      resolveToken().then(function (tk) {
-        if (tk) { loadFromHA(); }
+    var html = '';
+    groups.forEach(function (g, i) {
+      if (!buckets[i].length) return;
+      html += '<div class="group">' + g[0] + ' · ' + buckets[i].length + '</div>';
+      buckets[i].forEach(function (t) {
+        var d = M.dayDiff(t.date, S.today);
+        var sub = t.done ? '已完成' : d < 0 ? '逾期 ' + (-d) + ' 天' : d === 0 ? '今天' : d === 1 ? '明天' : t.date.slice(5);
+        html += '<div class="row' + (t.done ? ' done' : '') + '">' +
+          '<input type="checkbox" style="width:auto" data-todo-check="' + M.esc(t.id) + '"' + (t.done ? ' checked' : '') + '>' +
+          '<span class="txt">' + M.esc(t.text) + '</span><span class="sub">' + sub + '</span>' +
+          '<button class="ghost danger" data-todo-del="' + M.esc(t.id) + '">×</button></div>';
       });
-    }
-
-    $('prev').onclick = function () { view = new Date(view.getFullYear(), view.getMonth() - 1, 1); render(); };
-    $('next').onclick = function () { view = new Date(view.getFullYear(), view.getMonth() + 1, 1); render(); };
-    $('statToday').onclick = function () {
-      view = new Date(TODAY.getFullYear(), TODAY.getMonth(), 1);
-      render();
-    };
-    $('grid').onclick = function (e) {
-      if (lpFired) { lpFired = false; return; }   // 长按已弹菜单，别再选中/切换
-      var cell = e.target.closest('.d');
-      if (!cell || !cell.dataset.date) { return; }
-      if (cell.dataset.other) {              // 点前后月的日期 = 翻到那个月
-        var parts = cell.dataset.date.split('-');
-        view = new Date(+parts[0], +parts[1] - 1, 1);
-        selected = null;
-        render();
-        return;
-      }
-      var d = cell.dataset.date;
-      if (selected !== d) {                 // 第一次点：只选中，不改状态
-        selected = d;
-        render();
-        say('已选中 ' + d + '，再点切换相反班/休，再点恢复。');
-        return;
-      }
-      cycle(d);                             // 本地切换：相反状态 → 再点恢复
-      if (liveHA()) { persistNow(); }       // 真实 HA 环境实时落盘，无需再点保存
-      var ck = classify(d, parseYearText(holText)).kind;
-      var state = ck === 'custom-work' ? '上班' : (ck === 'custom-rest' ? '休息' : null);
-      var tail = liveHA() ? '，已自动保存。' : '（预览模式，改动不会保存，请在 HA 中打开操作）。';
-      say(state
-        ? d + ' 已设为「' + state + '」' + tail
-        : d + ' 已恢复原状' + tail);
-    };
-    $('customText').oninput = function () {
-      var p = parseCustomText(this.value);
-      ovr.work = new Set(p.work);
-      ovr.rest = new Set(p.rest);
-      render();
-      if (liveHA()) { persistNow(); }       // 文本框批量改完也即时落盘，无需保存按钮
-    };
-    loadFold();
-    setupFold('custom');
-    setupFold('todo');
-    setupFold('anniv');
-    $('annivAdd').onclick = toggleAnnivForm;
-    $('todoAdd').onclick = toggleTodoForm;
-    function formKeys(textId, dateId, onSave, onCancel) {
-      [textId, dateId].forEach(function (id) {
-        var el = $(id);
-        if (!el) { return; }
-        el.onkeydown = function (e) {
-          if (e.key === 'Enter') { onSave(); }
-          else if (e.key === 'Escape') { onCancel(); }
-        };
-      });
-    }
-    formKeys('todoText', 'todoDate', submitTodo, closeTodoForm);
-    formKeys('annivName', 'annivDate', submitAnniv, closeAnnivForm);
-    $('annivName').onkeydown = function (e) { if (e.key === 'Enter') { submitAnniv(); } };
-
-    // 右键 / 鼠标按住 / 手机长按 都能弹菜单；长按 600ms 同时选中该格子
-    var gridEl = $('grid');
-    var lpTimer = null, lpFrom = null;
-
-    function cancelLp() {
-      if (lpTimer) { clearTimeout(lpTimer); lpTimer = null; }
-      lpFrom = null;
-    }
-    function startLp(cell, x, y) {
-      cancelLp();
-      lpFired = false;                       // 新的一次按下，先清掉上次的标志
-      lpFrom = { x: x, y: y };
-      var day = cell.dataset.date;
-      lpTimer = setTimeout(function () {
-        lpTimer = null;
-        lpFired = true;                      // 吞掉随后那次 click，别把格子切换状态
-        selected = day;                      // 长按顺带选中
-        render();
-        ctxOpen(x, y, day);
-      }, 600);
-    }
-    function movedTooFar(x, y) {
-      return !!lpFrom &&
-        (Math.abs(x - lpFrom.x) > 8 || Math.abs(y - lpFrom.y) > 8);
-    }
-
-    gridEl.addEventListener('contextmenu', function (e) {
-      var cell = e.target.closest('.d');
-      if (!cell || !cell.dataset.date) { return; }
-      e.preventDefault();
-      cancelLp();
-      lpFired = false;
-      var day = cell.dataset.date;
-      if (selected !== day) {                // 右键即选中该格子，选中框跟着菜单走
-        selected = day;
-        render();
-      }
-      ctxOpen(e.clientX, e.clientY, day);
     });
-
-    gridEl.addEventListener('touchstart', function (e) {
-      var cell = e.target.closest('.d');
-      if (!cell || !cell.dataset.date || e.touches.length !== 1) { return; }
-      startLp(cell, e.touches[0].clientX, e.touches[0].clientY);
-    }, { passive: true });
-    gridEl.addEventListener('touchmove', function (e) {
-      if (!e.touches.length || movedTooFar(e.touches[0].clientX, e.touches[0].clientY)) {
-        cancelLp();
-      }
-    }, { passive: true });
-    gridEl.addEventListener('touchend', cancelLp);
-    gridEl.addEventListener('touchcancel', cancelLp);
-
-    gridEl.addEventListener('mousedown', function (e) {
-      if (e.button !== 0) { return; }        // 右键交给 contextmenu
-      var cell = e.target.closest('.d');
-      if (!cell || !cell.dataset.date) { return; }
-      startLp(cell, e.clientX, e.clientY);
-    });
-    gridEl.addEventListener('mousemove', function (e) {
-      if (movedTooFar(e.clientX, e.clientY)) { cancelLp(); }
-    });
-    gridEl.addEventListener('mouseup', cancelLp);
-    gridEl.addEventListener('mouseleave', cancelLp);
-
-    document.addEventListener('click', function (e) {
-      if (lpFired) { return; }               // 长按弹菜单后松手那次 click，不当作「点外面」
-      var box = $('ctx');
-      if (!box || !box.classList.contains('show')) { return; }
-      if (e.target.closest && e.target.closest('#ctx')) { return; }
-      ctxHide();
-    }, true);
-    // 在格子以外重新按下，说明上一轮长按早结束了，标志清掉，别误吞后续点击
-    var clearLpFlag = function (e) {
-      if (!e.target.closest || !e.target.closest('.d')) { lpFired = false; }
-    };
-    document.addEventListener('mousedown', clearLpFlag, true);
-    document.addEventListener('touchstart', clearLpFlag, true);
-    document.addEventListener('keydown', function (e) {
-      if (e.key === 'Escape') { ctxHide(); }
-    });
-    // 以前这里直接 ctxHide：手机上点「新增待办」弹出输入框的瞬间，软键盘会让视口变化，
-    // 菜单立刻被关掉，根本来不及输入。改成只重新摆位置。
-    window.addEventListener('resize', ctxKeepInView);
-    if (window.visualViewport) {
-      window.visualViewport.addEventListener('resize', ctxKeepInView);
-    }
+    $('todos').innerHTML = html || '<div class="hint">还没有待办。</div>';
   }
+  function saveTodos(next) { return write('set_todos', { todos: next }); }
+  function renderAnns() {
+    var list = (S.workday.anniversaries || []).slice().sort(function (a, b) { return a.date.localeCompare(b.date); });
+    $('anns').innerHTML = list.length ? list.map(function (a) {
+      return '<div class="row"><span class="txt">' + M.esc(a.name) + '</span>' +
+        '<span class="sub">' + M.esc(a.date) + (a.repeat ? ' · 每年' : '') + '</span>' +
+        '<button class="ghost danger" data-ann-del="' + M.esc(a.id) + '">×</button></div>';
+    }).join('') : '<div class="hint">还没有纪念日。</div>';
+  }
+  function renderCustom() {
+    var w = S.workday;
+    $('customText').value = '上班: ' + (w.custom_work || []).join(',') + '\n休息: ' + (w.custom_rest || []).join(',');
+  }
+  function renderDue() {
+    var list = S.maintenance.due_items || [];
+    $('dueList').innerHTML = list.length ? list.slice(0, 12).map(function (d) {
+      return '<div class="row"><span class="pill ' + (d.status === 'due' ? 'due' : 'soon') + '">' +
+        (d.status === 'due' ? '已到期' : '快到了') + '</span>' +
+        '<span class="txt">' + M.esc(d.project) + ' · ' + M.esc(d.name) + '</span>' +
+        '<span class="sub">' + M.esc(d.due_date) + '</span></div>';
+    }).join('') : '<div class="hint">目前没有到期或快到期的维护项。</div>';
+  }
+  function render() { renderStats(); renderCal(); renderTodos(); renderAnns(); renderCustom(); renderDue(); }
 
-  document.addEventListener('DOMContentLoaded', boot);
+  $('prevM').onclick = function () { month--; if (month < 1) { month = 12; year--; } renderCal(); };
+  $('nextM').onclick = function () { month++; if (month > 12) { month = 1; year++; } renderCal(); };
+  $('thisM').onclick = function () { var t = M.dateOf(S.today); year = t.getFullYear(); month = t.getMonth() + 1; renderCal(); };
+  $('cal').onclick = function (e) {
+    var cell = e.target.closest('[data-iso]'); if (!cell || !S) return;
+    var key = cell.dataset.iso, w = S.workday;
+    var mode = (w.custom_rest || []).indexOf(key) >= 0 || (w.custom_work || []).indexOf(key) >= 0
+      ? 'auto' : (classify(M.dateOf(key)).work ? 'rest' : 'work');
+    write('set_day', { date: key, mode: mode });
+  };
+  $('todoAdd').onclick = function () {
+    var f = $('todoForm'); f.hidden = !f.hidden;
+    if (!f.hidden) { $('todoDate').value = S.today; $('todoText').value = ''; $('todoText').focus(); }
+  };
+  $('todoText').onkeydown = function (e) {
+    if (e.key === 'Escape') { $('todoForm').hidden = true; return; }
+    if (e.key !== 'Enter' || !this.value.trim()) return;
+    var next = (S.workday.todos || []).slice();
+    next.push({ id: 't' + Date.now().toString(36), date: $('todoDate').value || S.today, text: this.value.trim(), done: false });
+    $('todoForm').hidden = true;
+    saveTodos(next);
+  };
+  $('todos').onclick = function (e) {
+    var del = e.target.dataset.todoDel;
+    if (del) { saveTodos((S.workday.todos || []).filter(function (t) { return t.id !== del; })); return; }
+    var chk = e.target.dataset.todoCheck;
+    if (chk) {
+      var next = (S.workday.todos || []).map(function (t) {
+        return t.id === chk ? Object.assign({}, t, { done: e.target.checked }) : t;
+      });
+      saveTodos(next);
+    }
+  };
+  $('annAdd').onclick = function () { var f = $('annForm'); f.hidden = !f.hidden; if (!f.hidden) $('annName').focus(); };
+  $('annSave').onclick = function () {
+    var name = $('annName').value.trim(), date = $('annDate').value.trim();
+    if (!name || !date) { M.toast('名称和日期都要填', true); return; }
+    var next = (S.workday.anniversaries || []).slice();
+    next.push({ id: 'a' + Date.now().toString(36), name: name, date: date, repeat: $('annRepeat').value === '1' });
+    $('annForm').hidden = true;
+    write('set_anniversaries', { anniversaries: next });
+  };
+  $('anns').onclick = function (e) {
+    var id = e.target.dataset.annDel; if (!id) return;
+    write('set_anniversaries', {
+      anniversaries: (S.workday.anniversaries || []).filter(function (a) { return a.id !== id; })
+    });
+  };
+  $('customSave').onclick = function () {
+    var work = [], rest = [];
+    $('customText').value.split('\n').forEach(function (line) {
+      var dates = (line.match(/\d{4}-\d{2}-\d{2}/g) || []).join(',');
+      if (!dates) return;
+      if (line.indexOf('班') >= 0) work.push(dates);
+      else if (line.indexOf('休') >= 0 || line.indexOf('假') >= 0) rest.push(dates);
+    });
+    write('set_custom', { work: work.join(','), rest: rest.join(',') });
+  };
+  M.onUpdate(load);
+  M.start();
+  load();
 })();
 </script>
 </body>
