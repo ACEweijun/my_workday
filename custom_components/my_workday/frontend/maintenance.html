@@ -309,7 +309,8 @@
       write('update_project', data);
     } else {
       data.slug = pslug; data.type = $('projType').value;
-      write('add_project', data).then(function () { slug = pslug; lastCount = null; load(); });
+      slug = pslug; lastCount = null;
+      write('add_project', data);
     }
   }
 
@@ -346,6 +347,7 @@
     if (t.dataset.pmclose !== undefined) { closeMenu(); return; }
     var act = t.dataset.pm; if (!act) return;
     var target = menuSlug || slug;
+    var armed = deleteArmed;
     closeMenu();
     if (act === 'edit') { slug = target; openForm(true); return; }
     if (act === 'log') { slug = target; render(); $('logForm').hidden = false; $('logDate').value = S.today; return; }
@@ -360,8 +362,9 @@
       return;
     }
     if (act === 'del') {
-      if (!deleteArmed) { deleteArmed = true; menuSlug = target; renderMenu(); return; }
-      write('delete_project', { slug: target }).then(function () { slug = null; lastCount = null; load(); });
+      if (!armed) { deleteArmed = true; menuSlug = target; renderMenu(); return; }
+      slug = null; lastCount = null;
+      write('delete_project', { slug: target });
     }
   };
   $('projNext').onclick = function () {

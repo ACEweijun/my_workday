@@ -120,3 +120,5 @@ main{max-width:920px;margin:0 auto;padding:14px;display:flex;flex-direction:colu
 .logtable th,.logtable td{text-align:left;padding:6px 4px;border-bottom:.5px solid var(--line)}
 .logtable input[type=text]{padding:4px 6px;font-size:12px}
 @media (max-width:620px){.mt-layout{flex-direction:column}.mt-side{width:100%;order:-1;position:static;flex-direction:row;overflow-x:auto;gap:6px;padding-bottom:4px}.mt-side .tab{width:auto;flex:none}.fold{padding:10px}.fold-body{padding:10px}}
+
+.stat .sub2{font-size:10px;color:var(--muted);margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}

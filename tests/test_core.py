@@ -229,6 +229,37 @@ class TestRepo(unittest.TestCase):
         self.assertIn('.mt-layout{display:flex;flex-direction:row;', css)
         self.assertIn('#overview{grid-template-columns:repeat(4,', css)
 
+    def test_stats_follow_month_and_jump_today(self):
+        html = (PKG / 'frontend' / 'workday.html').read_text(encoding='utf-8')
+        for token in ('function monthStats()', 'function jumpToday()',
+                      'data-jump-today', '月工作日 · 剩余/总数',
+                      'renderStats(); renderCal();'):
+            self.assertIn(token, html)
+        self.assertNotIn('dateLabel', html)
+        self.assertNotIn('本月工作日', html)
+
+    def test_next_special_day_merges_holidays_and_anniversaries(self):
+        html = (PKG / 'frontend' / 'workday.html').read_text(encoding='utf-8')
+        for token in ('function nextSpecialDay()', '距离下一个节假日和纪念日',
+                      'S.workday.anniversaries', 'h.off || []'):
+            self.assertIn(token, html)
+        self.assertNotIn('next_holiday', html)
+
+    def test_day_label_and_menu_modes(self):
+        html = (PKG / 'frontend' / 'workday.html').read_text(encoding='utf-8')
+        for token in ('function dayLabel(', 'function baseWork(', 'function customMode(',
+                      'if (!curWork)', 'if (cm) modes +='):
+            self.assertIn(token, html)
+        self.assertNotIn("' · ' + (c.work ? '上班' : '休息')", html)
+        css = (PKG / 'frontend' / 'shared.css').read_text(encoding='utf-8')
+        self.assertIn('.stat .sub2', css)
+
+    def test_delete_project_confirmation_works(self):
+        html = (PKG / 'frontend' / 'maintenance.html').read_text(encoding='utf-8')
+        self.assertIn('var armed = deleteArmed;', html)
+        self.assertIn('if (!armed)', html)
+        self.assertNotIn("write('delete_project', { slug: target }).then(function ()", html)
+
     def test_frontend_routing_and_ws_snapshot(self):
         init = (PKG / '__init__.py').read_text(encoding='utf-8')
         self.assertIn('FrontendFileView', init)

@@ -9,7 +9,6 @@
 <body>
 <header class="bar">
   <b>我的工作日</b>
-  <span class="date" id="dateLabel"></span>
 </header>
 <div id="msg" class="msg" hidden></div>
 <div id="cellMenu" class="menu" hidden></div>
@@ -117,20 +116,79 @@
     var g = day.getDay();
     return { work: g >= 1 && g <= 5, label: '' };
   }
+  function monthStats() {
+    var days = new Date(year, month, 0).getDate(), total = 0, left = 0;
+    for (var d = 1; d <= days; d++) {
+      var day = new Date(year, month - 1, d), key = iso(day);
+      if (classify(day).work) { total++; if (key >= S.today) left++; }
+    }
+    return { total: total, left: left };
+  }
+  function nextSpecialDay() {
+    var t = S.today, h = S.holidays || {}, names = h.names || {}, best = null;
+    function consider(date, name) {
+      if (!date || date < t) return;
+      var delta = M.dayDiff(date, t);
+      if (isFinite(delta) && (!best || delta < best.days)) best = { date: date, name: name, days: delta };
+    }
+    (h.off || []).forEach(function (d) { consider(d, names[d] || '假期'); });
+    (S.workday.anniversaries || []).forEach(function (a) {
+      var raw = String(a.date || '');
+      if (a.repeat) {
+        var md = raw.length === 5 ? raw : raw.slice(5);
+        if (!/^\d{2}-\d{2}$/.test(md)) return;
+        var y = Number(t.slice(0, 4)), first = y + '-' + md;
+        consider(first < t ? (y + 1) + '-' + md : first, a.name);
+      } else consider(raw, a.name);
+    });
+    return best;
+  }
+  function baseWork(key) {
+    var h = S.holidays || {};
+    if ((h.makeup || []).indexOf(key) >= 0) return true;
+    if ((h.off || []).indexOf(key) >= 0) return false;
+    var g = M.dateOf(key).getDay();
+    return g >= 1 && g <= 5;
+  }
+  function customMode(key) {
+    var w = S.workday;
+    if ((w.custom_work || []).indexOf(key) >= 0) return 'work';
+    if ((w.custom_rest || []).indexOf(key) >= 0) return 'rest';
+    return null;
+  }
+  function dayLabel(key) {
+    var h = S.holidays || {}, cm = customMode(key);
+    if (cm) {
+      if (cm === 'work' && baseWork(key)) return '';
+      if (cm === 'rest' && !baseWork(key)) return '';
+      return cm === 'work' ? '班' : '休';
+    }
+    if ((h.makeup || []).indexOf(key) >= 0) return '补班';
+    if ((h.off || []).indexOf(key) >= 0) return (h.names || {})[key] || '放假';
+    return '';
+  }
   function renderStats() {
-    var w = S.workday, st = w.stats || {}, hol = w.next_holiday || {};
-    $('dateLabel').textContent = '今天 · ' + S.today;
-    var left = st.left == null ? '—' : st.left;
-    var total = st.total == null ? '—' : st.total;
-    var third = hol.name
-      ? '<div class="num orange">' + (hol.days == null ? '—' : hol.days) + ' 天</div><div class="lbl">距' + M.esc(hol.name) + '</div>'
+    var w = S.workday, ms = monthStats(), ev = nextSpecialDay();
+    var third = ev
+      ? '<div class="num orange">' + (ev.days === 0 ? '今天' : ev.days + ' 天') + '</div>' +
+        '<div class="lbl">距离下一个节假日和纪念日</div>' +
+        '<div class="sub2" title="' + M.esc(ev.name + ' · ' + ev.date) + '">' + M.esc(ev.name + ' · ' + ev.date) + '</div>'
       : '<div class="num red">' + S.maintenance.due_total + ' 项</div><div class="lbl">维护已到期</div>';
     $('stats').innerHTML =
-      '<div class="stat"><div class="num blue">' + left + ' / ' + total + '</div><div class="lbl">本月工作日 · 剩余/总数</div></div>' +
-      '<div class="stat"><div class="num">' + (w.today_work ? '上班' : '休息') + '</div><div class="lbl">今天 · ' + M.esc(w.today_label || '') + '</div></div>' +
+      '<div class="stat"><div class="num blue">' + ms.left + ' / ' + ms.total + '</div>' +
+        '<div class="lbl">' + year + ' 年 ' + month + ' 月工作日 · 剩余/总数</div></div>' +
+      '<div class="stat" data-jump-today style="cursor:pointer" title="回到本月并定位到今天">' +
+        '<div class="num">' + (w.today_work ? '上班' : '休息') + '</div>' +
+        '<div class="lbl">今天 · ' + S.today + ' · ' + M.esc(w.today_label || '') + '</div></div>' +
       '<div class="stat">' + third + '</div>';
     $('sourceLabel').textContent = '放假数据：' +
       ({ network: 'holiday-cn 自动获取', manual: '手工覆盖', fallback: '未获取到，按周末规则降级' }[w.holiday_source] || '未获取到');
+  }
+  function jumpToday() {
+    var t = M.dateOf(S.today);
+    year = t.getFullYear(); month = t.getMonth() + 1;
+    selectedCell = S.today;
+    renderStats(); renderCal();
   }
   function annOn(a, key) {
     return a.repeat ? String(a.date) === key.slice(5) : String(a.date) === key;
@@ -144,7 +202,7 @@
   function renderCal() {
     var ys = $('calYear'), ms = $('calMonth');
     var baseY = M.dateOf(S.today).getFullYear(), years = [];
-    for (var yy = baseY - 3; yy <= baseY + 3; yy++) years.push(yy);
+    for (var yy = Math.min(baseY - 3, year); yy <= Math.max(baseY + 3, year); yy++) years.push(yy);
     if (ys) { ys.innerHTML = years.map(function (v) { return '<option value="' + v + '">' + v + ' 年</option>'; }).join(''); ys.value = String(year); }
     if (ms) { ms.innerHTML = [1,2,3,4,5,6,7,8,9,10,11,12].map(function (v) { return '<option value="' + v + '">' + v + ' 月</option>'; }).join(''); ms.value = String(month); }
     $('calHead').innerHTML = ['一', '二', '三', '四', '五', '六', '日']
@@ -171,7 +229,7 @@
       html += '<div class="' + cls + '" data-iso="' + key + '" title="' + M.esc(parts.join(' / ')) + '">' +
         (corner ? '<span class="corner">' + corner + '</span>' : '') +
         '<span class="d">' + day.getDate() + '</span>' +
-        (c.label ? '<span class="lbl">' + M.esc(c.label) + '</span>' : '') +
+        (dayLabel(key) ? '<span class="lbl">' + M.esc(dayLabel(key)) + '</span>' : '') +
         (open.length ? '<span class="todo1">' + M.esc(open[0].text) + '</span>' : '') +
         (open.length > 1 ? '<span class="cnt">' + open.length + '</span>' : '') +
         '<span class="marks">' + marks + '</span></div>';
@@ -180,9 +238,9 @@
   }
   function menuHtml() {
     if (!menuDate || !S) return '';
-    var d = cellData(menuDate), c = classify(M.dateOf(menuDate));
+    var d = cellData(menuDate);
     var h = '<h3><button class="ghost" data-mclose style="float:right;padding:1px 7px">×</button>' +
-      M.esc(menuDate) + ' · ' + (c.work ? '上班' : '休息') + '</h3>';
+      M.esc(menuDate) + '</h3>';
     d.todos.forEach(function (t) {
       h += '<div class="mrow"><span class="mkind">待</span>' +
         '<span class="mt' + (t.done ? ' done' : '') + '" data-mtodo-edit="' + M.esc(t.id) + '" title="点击改文字">' + M.esc(t.text) + '</span>' +
@@ -207,8 +265,13 @@
       h += '<input id="menuInput" placeholder="名称，如 生日">' +
         '<label class="hint" style="display:block;margin-top:6px"><input type="checkbox" id="menuRepeat" style="width:auto" checked> 每年重复（只记月日）</label>';
     }
-    h += '<div class="modes"><button data-mday="work">算上班</button><button data-mday="rest">算休息</button>' +
-      '<button data-mday="auto">恢复安排</button></div>';
+    var cm = customMode(menuDate), bw = baseWork(menuDate);
+    var curWork = cm ? cm === 'work' : bw;
+    var modes = '';
+    if (!curWork) modes += '<button data-mday="work">算上班</button>';
+    if (curWork) modes += '<button data-mday="rest">算休息</button>';
+    if (cm) modes += '<button data-mday="auto">恢复安排</button>';
+    h += '<div class="modes">' + modes + '</div>';
     return h;
   }
   function openMenu(key, x, y) {
@@ -327,9 +390,13 @@
     applyFolds();
   }
 
-  $('prevM').onclick = function () { month--; if (month < 1) { month = 12; year--; } renderCal(); };
-  $('nextM').onclick = function () { month++; if (month > 12) { month = 1; year++; } renderCal(); };
-  $('thisM').onclick = function () { var t = M.dateOf(S.today); year = t.getFullYear(); month = t.getMonth() + 1; renderCal(); };
+  $('prevM').onclick = function () { month--; if (month < 1) { month = 12; year--; } renderStats(); renderCal(); };
+  $('nextM').onclick = function () { month++; if (month > 12) { month = 1; year++; } renderStats(); renderCal(); };
+  $('thisM').onclick = jumpToday;
+  $('stats').onclick = function (e) {
+    var card = e.target.closest && e.target.closest('[data-jump-today]');
+    if (card && S) jumpToday();
+  };
   $('cal').onclick = function (e) {
     if (suppressClick) { suppressClick = false; return; }
     var cell = e.target.closest('[data-iso]'); if (!cell || !S) return;
@@ -337,7 +404,7 @@
     if (!$('cellMenu').hidden) closeMenu();
     if (String(cell.className).indexOf('out') >= 0) {
       var jump = M.dateOf(key); year = jump.getFullYear(); month = jump.getMonth() + 1;
-      selectedCell = key; renderCal(); return;
+      selectedCell = key; renderStats(); renderCal(); return;
     }
     if (selectedCell !== key) { selectedCell = key; renderCal(); return; }
     var mode = (w.custom_rest || []).indexOf(key) >= 0 || (w.custom_work || []).indexOf(key) >= 0
@@ -473,8 +540,8 @@
     write('set_custom', { work: work.join(','), rest: rest.join(',') });
   }
   $('customText').onchange = saveCustom;
-  $('calYear').onchange = function () { year = Number($('calYear').value) || year; renderCal(); };
-  $('calMonth').onchange = function () { month = Number($('calMonth').value) || month; renderCal(); };
+  $('calYear').onchange = function () { year = Number($('calYear').value) || year; renderStats(); renderCal(); };
+  $('calMonth').onchange = function () { month = Number($('calMonth').value) || month; renderStats(); renderCal(); };
   Array.prototype.slice.call(document.querySelectorAll('[data-fold]')).forEach(function (head) {
     head.onclick = function (e) {
       if (e.target.tagName === 'BUTTON') return;
