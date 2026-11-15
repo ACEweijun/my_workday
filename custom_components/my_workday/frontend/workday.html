@@ -12,12 +12,15 @@
   <span class="date" id="dateLabel"></span>
 </header>
 <div id="msg" class="msg" hidden></div>
+<div id="cellMenu" class="menu" hidden></div>
 <main>
   <section class="stats" id="stats"></section>
 
   <section class="card">
     <div class="card-head">
-      <h2 id="calTitle"></h2><span class="spacer"></span>
+      <select id="calYear" class="mini"></select>
+      <select id="calMonth" class="mini"></select>
+      <span class="spacer"></span>
       <button class="ghost" id="prevM">‹</button>
       <button class="ghost" id="thisM">本月</button>
       <button class="ghost" id="nextM">›</button>
@@ -27,35 +30,45 @@
     <div class="hint" id="sourceLabel" style="margin-top:8px"></div>
   </section>
 
-  <section class="card">
-    <div class="card-head"><h2>我的待办</h2><span class="spacer"></span><button class="primary" id="todoAdd">+ 新增</button></div>
-    <div class="form" id="todoForm" hidden>
-      <div><label>日期</label><input type="date" id="todoDate"></div>
-      <div class="full"><label>要做什么</label><input id="todoText" placeholder="回车保存 · Esc 取消"></div>
+  <section class="card fold-card">
+    <div class="fold" data-fold="todos"><span class="chev">▸</span><b>我的待办</b><span class="spacer"></span>
+      <span class="summary" id="todoSummary"></span><button class="ghost" id="todoAdd">+ 新增</button></div>
+    <div class="fold-body" id="fold-todos" hidden>
+      <div class="form" id="todoForm" hidden>
+        <div><label>日期</label><input type="date" id="todoDate"></div>
+        <div class="full"><label>要做什么</label><input id="todoText" placeholder="回车保存 · Esc 取消"></div>
+      </div>
+      <div id="todos"></div>
     </div>
-    <div id="todos"></div>
   </section>
 
-  <section class="card">
-    <div class="card-head"><h2>我的纪念日</h2><span class="spacer"></span><button class="primary" id="annAdd">+ 新增</button></div>
-    <div class="form" id="annForm" hidden>
-      <div><label>名称</label><input id="annName" placeholder="生日"></div>
-      <div><label>日期</label><input id="annDate" placeholder="05-20 或 2026-12-01"></div>
-      <div><label>每年重复</label><select id="annRepeat"><option value="1">是</option><option value="0">否</option></select></div>
-      <div class="full"><button class="primary" id="annSave">保存</button></div>
+  <section class="card fold-card">
+    <div class="fold" data-fold="anns"><span class="chev">▸</span><b>我的纪念日</b><span class="spacer"></span>
+      <span class="summary" id="annSummary"></span><button class="ghost" id="annAdd">+ 新增</button></div>
+    <div class="fold-body" id="fold-anns" hidden>
+      <div class="form" id="annForm" hidden>
+        <div><label>名称</label><input id="annName" placeholder="生日"></div>
+        <div><label>日期</label><input id="annDate" placeholder="05-20 或 2026-12-01"></div>
+        <div><label>每年重复</label><select id="annRepeat"><option value="1">是</option><option value="0">否</option></select></div>
+        <div class="full"><button class="primary" id="annSave">保存</button></div>
+      </div>
+      <div id="anns"></div>
     </div>
-    <div id="anns"></div>
   </section>
 
-  <section class="card">
-    <div class="card-head"><h2>我自定义的工作日</h2><span class="spacer"></span><button class="primary" id="customSave">保存</button></div>
-    <textarea id="customText" placeholder="上班: 2026-11-28,2026-11-29&#10;休息: 2026-11-27"></textarea>
-    <div class="hint" style="margin-top:6px">含「班」的行算上班，含「休 / 假」的行算休息；清空即取消全部自定义。</div>
+  <section class="card fold-card">
+    <div class="fold" data-fold="custom"><span class="chev">▸</span><b>我自定义的工作日</b><span class="spacer"></span>
+      <span class="summary" id="customSummary"></span></div>
+    <div class="fold-body" id="fold-custom" hidden>
+      <textarea id="customText" placeholder="上班: 2026-11-28,2026-11-29&#10;休息: 2026-11-27"></textarea>
+      <div class="hint" style="margin-top:6px">含「班」的行算上班，含「休 / 假」的行算休息；清空即取消全部自定义。改动自动保存。</div>
+    </div>
   </section>
 
-  <section class="card">
-    <div class="card-head"><h2>维护到期</h2></div>
-    <div id="dueList"></div>
+  <section class="card fold-card">
+    <div class="fold" data-fold="due"><span class="chev">▸</span><b>维护到期</b><span class="spacer"></span>
+      <span class="summary" id="dueSummary"></span></div>
+    <div class="fold-body" id="fold-due" hidden><div id="dueList"></div></div>
   </section>
 </main>
 <script src="shared.js"></script>
@@ -63,6 +76,9 @@
 (function () {
   'use strict';
   var M = window.MW, $ = M.$, S = null, busy = false, year, month, retries = 0;
+  var menuDate = null, menuType = null, selectedCell = null, suppressClick = false, touchTimer = null, touchXY = null;
+  var FOLD_KEY = 'my_workday_fold2', fold = {};
+  try { fold = JSON.parse(localStorage.getItem(FOLD_KEY) || '{}') || {}; } catch (e) { fold = {}; }
 
   function retryLoad() {
     if (retries >= 3) return;
@@ -116,37 +132,123 @@
     $('sourceLabel').textContent = '放假数据：' +
       ({ network: 'holiday-cn 自动获取', manual: '手工覆盖', fallback: '未获取到，按周末规则降级' }[w.holiday_source] || '未获取到');
   }
+  function annOn(a, key) {
+    return a.repeat ? String(a.date) === key.slice(5) : String(a.date) === key;
+  }
+  function cellData(key) {
+    var todos = (S.workday.todos || []).filter(function (t) { return t.date === key; });
+    var anns = (S.workday.anniversaries || []).filter(function (a) { return annOn(a, key); });
+    var dues = (S.maintenance.due_items || []).filter(function (d) { return d.due_date === key; });
+    return { todos: todos, anns: anns, dues: dues };
+  }
   function renderCal() {
-    $('calTitle').textContent = year + ' 年 ' + month + ' 月';
+    var ys = $('calYear'), ms = $('calMonth');
+    var baseY = M.dateOf(S.today).getFullYear(), years = [];
+    for (var yy = baseY - 3; yy <= baseY + 3; yy++) years.push(yy);
+    if (ys) { ys.innerHTML = years.map(function (v) { return '<option value="' + v + '">' + v + ' 年</option>'; }).join(''); ys.value = String(year); }
+    if (ms) { ms.innerHTML = [1,2,3,4,5,6,7,8,9,10,11,12].map(function (v) { return '<option value="' + v + '">' + v + ' 月</option>'; }).join(''); ms.value = String(month); }
     $('calHead').innerHTML = ['一', '二', '三', '四', '五', '六', '日']
       .map(function (d) { return '<div>' + d + '</div>'; }).join('');
     var first = new Date(year, month - 1, 1);
     var offset = (first.getDay() + 6) % 7;
     var start = new Date(year, month - 1, 1 - offset);
-    var todos = {}, due = {};
-    (S.workday.todos || []).forEach(function (t) {
-      if (!t.done) todos[t.date] = (todos[t.date] || 0) + 1;
-    });
-    (S.maintenance.due_items || []).forEach(function (d) {
-      due[d.due_date] = (due[d.due_date] || 0) + 1;
-    });
     var html = '';
     for (var i = 0; i < 42; i++) {
       var day = new Date(start); day.setDate(start.getDate() + i);
-      var key = iso(day), c = classify(day);
+      var key = iso(day), c = classify(day), d = cellData(key);
+      var open = d.todos.filter(function (t) { return !t.done; });
+      var parts = [];
+      open.forEach(function (t) { parts.push('待办：' + t.text); });
+      d.anns.forEach(function (a) { parts.push('纪念：' + a.name); });
+      d.dues.forEach(function (x) { parts.push('维护：' + x.project + ' · ' + x.name); });
       var cls = 'cell ' + (c.work ? 'work' : 'rest') +
         (day.getMonth() + 1 !== month || day.getFullYear() !== year ? ' out' : '') +
-        (key === S.today ? ' today' : '');
-      var marks = '';
-      if (todos[key]) marks += '<span class="mark todo">' + todos[key] + '</span>';
-      if (due[key]) marks += '<span class="mark">' + due[key] + '</span>';
-      html += '<div class="' + cls + '" data-iso="' + key + '"><span class="d">' + day.getDate() + '</span>' +
+        (key === S.today ? ' today' : '') + (key === selectedCell ? ' sel' : '');
+      var corner = '';
+      if (open.length) corner += '<span class="ct">待</span>';
+      if (d.anns.length) corner += '<span class="ct ann">纪</span>';
+      var marks = d.dues.length ? '<span class="mark">' + d.dues.length + '</span>' : '';
+      html += '<div class="' + cls + '" data-iso="' + key + '" title="' + M.esc(parts.join(' / ')) + '">' +
+        (corner ? '<span class="corner">' + corner + '</span>' : '') +
+        '<span class="d">' + day.getDate() + '</span>' +
         (c.label ? '<span class="lbl">' + M.esc(c.label) + '</span>' : '') +
+        (open.length ? '<span class="todo1">' + M.esc(open[0].text) + '</span>' : '') +
+        (open.length > 1 ? '<span class="cnt">' + open.length + '</span>' : '') +
         '<span class="marks">' + marks + '</span></div>';
     }
     $('cal').innerHTML = html;
   }
+  function menuHtml() {
+    if (!menuDate || !S) return '';
+    var d = cellData(menuDate), c = classify(M.dateOf(menuDate));
+    var h = '<h3><button class="ghost" data-mclose style="float:right;padding:1px 7px">×</button>' +
+      M.esc(menuDate) + ' · ' + (c.work ? '上班' : '休息') + '</h3>';
+    d.todos.forEach(function (t) {
+      h += '<div class="mrow"><span class="mkind">待</span>' +
+        '<span class="mt' + (t.done ? ' done' : '') + '" data-mtodo-edit="' + M.esc(t.id) + '" title="点击改文字">' + M.esc(t.text) + '</span>' +
+        '<button data-mtodo-done="' + M.esc(t.id) + '">' + (t.done ? '恢复' : '完成') + '</button>' +
+        '<button class="danger" data-mtodo-del="' + M.esc(t.id) + '">×</button></div>';
+    });
+    d.anns.forEach(function (a) {
+      h += '<div class="mrow"><span class="mkind ann">纪</span>' +
+        '<span class="mt" data-mann-edit="' + M.esc(a.id) + '" title="点击改名称">' + M.esc(a.name) + '</span>' +
+        '<button class="danger" data-mann-del="' + M.esc(a.id) + '">×</button></div>';
+    });
+    d.dues.forEach(function (x) {
+      h += '<div class="mrow"><span class="mkind due">维</span><span class="mt">' +
+        M.esc(x.project + ' · ' + x.name) + '</span></div>';
+    });
+    if (!d.todos.length && !d.anns.length && !d.dues.length) h += '<div class="hint">这天还没有安排。</div>';
+    h += '<div class="types"><button data-mtype="todo" class="' + (menuType === 'todo' ? 'on' : '') + '">待办</button>' +
+      '<button data-mtype="ann" class="' + (menuType === 'ann' ? 'on' : '') + '">纪念日</button></div>';
+    if (menuType === 'todo') {
+      h += '<input id="menuInput" placeholder="要做什么，回车保存"><div class="hint">不选类型或留空回车不会写入 · Esc 关闭</div>';
+    } else if (menuType === 'ann') {
+      h += '<input id="menuInput" placeholder="名称，如 生日">' +
+        '<label class="hint" style="display:block;margin-top:6px"><input type="checkbox" id="menuRepeat" style="width:auto" checked> 每年重复（只记月日）</label>';
+    }
+    h += '<div class="modes"><button data-mday="work">算上班</button><button data-mday="rest">算休息</button>' +
+      '<button data-mday="auto">恢复安排</button></div>';
+    return h;
+  }
+  function openMenu(key, x, y) {
+    if (!S) return;
+    menuDate = key; menuType = null;
+    var el = $('cellMenu');
+    el.hidden = false;
+    el.innerHTML = menuHtml();
+    var h = el.offsetHeight || 300;
+    el.style.left = Math.max(6, Math.min(x || 10, window.innerWidth - 288)) + 'px';
+    el.style.top = Math.max(6, Math.min(y || 10, window.innerHeight - h - 12)) + 'px';
+  }
+  function closeMenu() {
+    $('cellMenu').hidden = true;
+    menuDate = null; menuType = null;
+  }
+  function saveAnns(next) { return write('set_anniversaries', { anniversaries: next }); }
+  function inlineEdit(row, id, oldText, kind) {
+    row.innerHTML = '<input class="mini" value="' + M.esc(oldText) + '">';
+    var inp = row.querySelector('input');
+    if (!inp) return;
+    inp.focus();
+    inp.onkeydown = function (ev) {
+      if (ev.key === 'Escape') { $('cellMenu').innerHTML = menuHtml(); return; }
+      if (ev.key !== 'Enter' || !this.value.trim()) return;
+      var v = this.value.trim();
+      if (kind === 'todo') {
+        saveTodos((S.workday.todos || []).map(function (t) {
+          return t.id === id ? Object.assign({}, t, { text: v }) : t;
+        }));
+      } else {
+        saveAnns((S.workday.anniversaries || []).map(function (a) {
+          return a.id === id ? Object.assign({}, a, { name: v }) : a;
+        }));
+      }
+      $('cellMenu').innerHTML = menuHtml();
+    };
+  }
   function renderTodos() {
+    $('todoSummary').textContent = '未完成 ' + (S.workday.todos || []).filter(function (t) { return !t.done; }).length;
     var list = (S.workday.todos || []).slice().sort(function (a, b) { return a.date.localeCompare(b.date); });
     var groups = [['逾期', ''], ['今天', ''], ['未来 7 天', ''], ['以后', ''], ['已完成', '']];
     var buckets = [[], [], [], [], []];
@@ -161,7 +263,12 @@
     var html = '';
     groups.forEach(function (g, i) {
       if (!buckets[i].length) return;
-      html += '<div class="group">' + g[0] + ' · ' + buckets[i].length + '</div>';
+      if (i === 4) {
+        html += '<div class="group" data-donegroup>已完成 · ' + buckets[i].length + (fold.doneGroup ? ' ▴' : ' · 点展开 ▸') + '</div>';
+        if (!fold.doneGroup) return;
+      } else {
+        html += '<div class="group">' + g[0] + ' · ' + buckets[i].length + '</div>';
+      }
       buckets[i].forEach(function (t) {
         var d = M.dayDiff(t.date, S.today);
         var sub = t.done ? '已完成' : d < 0 ? '逾期 ' + (-d) + ' 天' : d === 0 ? '今天' : d === 1 ? '明天' : t.date.slice(5);
@@ -175,6 +282,7 @@
   }
   function saveTodos(next) { return write('set_todos', { todos: next }); }
   function renderAnns() {
+    $('annSummary').textContent = (S.workday.anniversaries || []).length + ' 个';
     var list = (S.workday.anniversaries || []).slice().sort(function (a, b) { return a.date.localeCompare(b.date); });
     $('anns').innerHTML = list.length ? list.map(function (a) {
       return '<div class="row"><span class="txt">' + M.esc(a.name) + '</span>' +
@@ -184,10 +292,12 @@
   }
   function renderCustom() {
     var w = S.workday;
+    $('customSummary').textContent = '上班 ' + (w.custom_work || []).length + ' · 休息 ' + (w.custom_rest || []).length;
     $('customText').value = '上班: ' + (w.custom_work || []).join(',') + '\n休息: ' + (w.custom_rest || []).join(',');
   }
   function renderDue() {
     var list = S.maintenance.due_items || [];
+    $('dueSummary').textContent = list.length + ' 项';
     $('dueList').innerHTML = list.length ? list.slice(0, 12).map(function (d) {
       return '<div class="row"><span class="pill ' + (d.status === 'due' ? 'due' : 'soon') + '">' +
         (d.status === 'due' ? '已到期' : '快到了') + '</span>' +
@@ -195,19 +305,121 @@
         '<span class="sub">' + M.esc(d.due_date) + '</span></div>';
     }).join('') : '<div class="hint">目前没有到期或快到期的维护项。</div>';
   }
-  function render() { renderStats(); renderCal(); renderTodos(); renderAnns(); renderCustom(); renderDue(); }
+  function render() {
+    renderStats(); renderCal(); renderTodos(); renderAnns(); renderCustom(); renderDue();
+    if (menuDate) $('cellMenu').innerHTML = menuHtml();
+    applyFolds();
+  }
+  function applyFolds() {
+    ['todos', 'anns', 'custom', 'due'].forEach(function (k) {
+      var body = $('fold-' + k), on = !!fold[k];
+      if (body) body.hidden = !on;
+      var head = document.querySelector('[data-fold="' + k + '"]');
+      if (!head) return;
+      head.className = 'fold' + (on ? ' open' : '');
+      var chev = head.querySelector('.chev');
+      if (chev) chev.textContent = on ? '▾' : '▸';
+    });
+  }
+  function toggleFold(k) {
+    fold[k] = !fold[k];
+    try { localStorage.setItem(FOLD_KEY, JSON.stringify(fold)); } catch (e) { }
+    applyFolds();
+  }
 
   $('prevM').onclick = function () { month--; if (month < 1) { month = 12; year--; } renderCal(); };
   $('nextM').onclick = function () { month++; if (month > 12) { month = 1; year++; } renderCal(); };
   $('thisM').onclick = function () { var t = M.dateOf(S.today); year = t.getFullYear(); month = t.getMonth() + 1; renderCal(); };
   $('cal').onclick = function (e) {
+    if (suppressClick) { suppressClick = false; return; }
     var cell = e.target.closest('[data-iso]'); if (!cell || !S) return;
     var key = cell.dataset.iso, w = S.workday;
+    if (!$('cellMenu').hidden) closeMenu();
+    if (String(cell.className).indexOf('out') >= 0) {
+      var jump = M.dateOf(key); year = jump.getFullYear(); month = jump.getMonth() + 1;
+      selectedCell = key; renderCal(); return;
+    }
+    if (selectedCell !== key) { selectedCell = key; renderCal(); return; }
     var mode = (w.custom_rest || []).indexOf(key) >= 0 || (w.custom_work || []).indexOf(key) >= 0
       ? 'auto' : (classify(M.dateOf(key)).work ? 'rest' : 'work');
     write('set_day', { date: key, mode: mode });
   };
-  $('todoAdd').onclick = function () {
+  $('cal').addEventListener('contextmenu', function (e) {
+    var cell = e.target.closest && e.target.closest('[data-iso]'); if (!cell) return;
+    e.preventDefault();
+    selectedCell = cell.dataset.iso;
+    renderCal();
+    openMenu(cell.dataset.iso, e.clientX, e.clientY);
+  });
+  $('cal').addEventListener('touchstart', function (e) {
+    var cell = e.target.closest && e.target.closest('[data-iso]'); if (!cell || !e.touches.length) return;
+    touchXY = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+    touchTimer = setTimeout(function () {
+      touchTimer = null; suppressClick = true;
+      selectedCell = cell.dataset.iso;
+      renderCal();
+      openMenu(cell.dataset.iso, touchXY.x, touchXY.y);
+      setTimeout(function () { suppressClick = false; }, 900);
+    }, 600);
+  }, { passive: true });
+  $('cal').addEventListener('touchend', function () {
+    if (touchTimer) { clearTimeout(touchTimer); touchTimer = null; }
+  });
+  $('cal').addEventListener('touchmove', function () {
+    if (touchTimer) { clearTimeout(touchTimer); touchTimer = null; }
+  });
+  $('cellMenu').onclick = function (e) {
+    var t = e.target, key = menuDate;
+    if (t.dataset.mclose !== undefined) { closeMenu(); return; }
+    var mt = t.dataset.mtype;
+    if (mt) {
+      menuType = menuType === mt ? null : mt;
+      this.innerHTML = menuHtml();
+      var focus = $('menuInput'); if (focus) focus.focus();
+      return;
+    }
+    var md = t.dataset.mday;
+    if (md) { closeMenu(); write('set_day', { date: key, mode: md }); return; }
+    var done = t.dataset.mtodoDone;
+    if (done) {
+      saveTodos((S.workday.todos || []).map(function (x) {
+        return x.id === done ? Object.assign({}, x, { done: !x.done }) : x;
+      }));
+      return;
+    }
+    var del = t.dataset.mtodoDel;
+    if (del) { saveTodos((S.workday.todos || []).filter(function (x) { return x.id !== del; })); return; }
+    var adel = t.dataset.mannDel;
+    if (adel) { saveAnns((S.workday.anniversaries || []).filter(function (x) { return x.id !== adel; })); return; }
+    var edit = t.dataset.mtodoEdit;
+    if (edit) { inlineEdit(t.parentNode, edit, t.textContent, 'todo'); return; }
+    var aedit = t.dataset.mannEdit;
+    if (aedit) { inlineEdit(t.parentNode, aedit, t.textContent, 'ann'); return; }
+  };
+  $('cellMenu').onkeydown = function (e) {
+    if (e.key === 'Escape') { closeMenu(); return; }
+    if (e.key !== 'Enter') return;
+    var inp = $('menuInput');
+    if (!inp || !inp.value.trim()) { if (!menuType) M.toast('先选类型', true); return; }
+    var text = inp.value.trim(), key = menuDate;
+    if (menuType === 'todo') {
+      var next = (S.workday.todos || []).slice();
+      next.push({ id: 't' + Date.now().toString(36), date: key, text: text, done: false });
+      saveTodos(next);
+    } else {
+      var rep = $('menuRepeat') ? $('menuRepeat').checked : true;
+      var list = (S.workday.anniversaries || []).slice();
+      list.push({ id: 'a' + Date.now().toString(36), name: text,
+                  date: rep ? key.slice(5) : key, repeat: rep });
+      saveAnns(list);
+    }
+    inp.value = '';
+  };
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && !$('cellMenu').hidden) closeMenu();
+  });
+  $('todoAdd').onclick = function (e) {
+    if (e && e.stopPropagation) e.stopPropagation();
     var f = $('todoForm'); f.hidden = !f.hidden;
     if (!f.hidden) { $('todoDate').value = S.today; $('todoText').value = ''; $('todoText').focus(); }
   };
@@ -221,6 +433,7 @@
     saveTodos(next);
   };
   $('todos').onclick = function (e) {
+    if (e.target.dataset && e.target.dataset.donegroup !== undefined) { toggleFold('doneGroup'); renderTodos(); return; }
     var del = e.target.dataset.todoDel;
     if (del) { saveTodos((S.workday.todos || []).filter(function (t) { return t.id !== del; })); return; }
     var chk = e.target.dataset.todoCheck;
@@ -231,7 +444,10 @@
       saveTodos(next);
     }
   };
-  $('annAdd').onclick = function () { var f = $('annForm'); f.hidden = !f.hidden; if (!f.hidden) $('annName').focus(); };
+  $('annAdd').onclick = function (e) {
+    if (e && e.stopPropagation) e.stopPropagation();
+    var f = $('annForm'); f.hidden = !f.hidden; if (!f.hidden) $('annName').focus();
+  };
   $('annSave').onclick = function () {
     var name = $('annName').value.trim(), date = $('annDate').value.trim();
     if (!name || !date) { M.toast('名称和日期都要填', true); return; }
@@ -246,7 +462,7 @@
       anniversaries: (S.workday.anniversaries || []).filter(function (a) { return a.id !== id; })
     });
   };
-  $('customSave').onclick = function () {
+  function saveCustom() {
     var work = [], rest = [];
     $('customText').value.split('\n').forEach(function (line) {
       var dates = (line.match(/\d{4}-\d{2}-\d{2}/g) || []).join(',');
@@ -255,7 +471,16 @@
       else if (line.indexOf('休') >= 0 || line.indexOf('假') >= 0) rest.push(dates);
     });
     write('set_custom', { work: work.join(','), rest: rest.join(',') });
-  };
+  }
+  $('customText').onchange = saveCustom;
+  $('calYear').onchange = function () { year = Number($('calYear').value) || year; renderCal(); };
+  $('calMonth').onchange = function () { month = Number($('calMonth').value) || month; renderCal(); };
+  Array.prototype.slice.call(document.querySelectorAll('[data-fold]')).forEach(function (head) {
+    head.onclick = function (e) {
+      if (e.target.tagName === 'BUTTON') return;
+      toggleFold(head.dataset.fold);
+    };
+  });
   M.onUpdate(load);
   M.start();
   load();

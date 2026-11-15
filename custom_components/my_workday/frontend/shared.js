@@ -60,7 +60,11 @@ window.MW = (function () {
     });
   }
   function unwrap(x) {
-    return (x && typeof x === 'object' && !Array.isArray(x) && 'response' in x) ? x.response : x;
+    if (x && typeof x === 'object' && !Array.isArray(x)) {
+      if (x.service_response !== undefined) return x.service_response;
+      if (x.response !== undefined) return x.response;
+    }
+    return x;
   }
   function call(service, data, wantResponse) {
     var path = '/api/services/' + DOMAIN + '/' + service + (wantResponse ? '?return_response=true' : '');

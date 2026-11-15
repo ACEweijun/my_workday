@@ -196,7 +196,7 @@ class TestRepo(unittest.TestCase):
     def test_project_tab_reset(self):
         html = (PKG / 'frontend' / 'maintenance.html').read_text(encoding='utf-8')
         self.assertIn('resetForms()', html)
-        self.assertIn('if (t.dataset.tab === slug) return;', html)
+        self.assertIn('if (target === slug)', html)
         self.assertIn('kept.indexOf(i.id)', html)
         self.assertNotIn('Number(this.value)', html)
 
@@ -204,6 +204,25 @@ class TestRepo(unittest.TestCase):
         src = (PKG / 'config_flow.py').read_text(encoding='utf-8')
         self.assertIn('return MyWorkdayOptionsFlow()', src)
         self.assertIn('async_get_entry(self.handler)', src)
+
+    def test_service_response_unwrap(self):
+        shared = (PKG / 'frontend' / 'shared.js').read_text(encoding='utf-8')
+        self.assertIn('x.service_response', shared)
+        self.assertIn('x.response', shared)
+
+    def test_workday_legacy_ui(self):
+        html = (PKG / 'frontend' / 'workday.html').read_text(encoding='utf-8')
+        for token in ('FOLD_KEY', 'data-fold="todos"', 'applyFolds', 'contextmenu',
+                      'touchstart', 'calYear', 'data-donegroup', 'cellMenu',
+                      'todoSummary', 'customSummary'):
+            self.assertIn(token, html)
+
+    def test_maintenance_legacy_ui(self):
+        html = (PKG / 'frontend' / 'maintenance.html').read_text(encoding='utf-8')
+        for token in ('projStep1', 'projStep2', 'projNext', 'projUnitLabel',
+                      'data-pm=', 'logtable', 'mt-side', 'contextmenu',
+                      'counterValue', 'data-lognote'):
+            self.assertIn(token, html)
 
     def test_frontend_routing_and_ws_snapshot(self):
         init = (PKG / '__init__.py').read_text(encoding='utf-8')
