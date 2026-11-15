@@ -224,6 +224,11 @@ class TestRepo(unittest.TestCase):
                       'counterValue', 'data-lognote'):
             self.assertIn(token, html)
 
+    def test_layout_css_fixes(self):
+        css = (PKG / 'frontend' / 'shared.css').read_text(encoding='utf-8')
+        self.assertIn('.mt-layout{display:flex;flex-direction:row;', css)
+        self.assertIn('#overview{grid-template-columns:repeat(4,', css)
+
     def test_frontend_routing_and_ws_snapshot(self):
         init = (PKG / '__init__.py').read_text(encoding='utf-8')
         self.assertIn('FrontendFileView', init)
