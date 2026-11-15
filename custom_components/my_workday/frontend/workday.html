@@ -193,7 +193,7 @@
     var w = S.workday, ms = monthStats(), ev = nextSpecialDay();
     var third = ev
       ? '<div class="num orange">' + (ev.days === 0 ? '今天' : ev.days + ' 天') + '</div>' +
-        '<div class="lbl">距离下一个节假日和纪念日</div>' +
+        '<div class="lbl">距离</div>' +
         '<div class="sub2" title="' + M.esc(ev.name + ' · ' + ev.date) + '">' + M.esc(ev.name + ' · ' + ev.date) + '</div>'
       : '<div class="num red">' + S.maintenance.due_total + ' 项</div><div class="lbl">维护已到期</div>';
     $('stats').innerHTML =

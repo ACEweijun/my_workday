@@ -240,7 +240,7 @@ class TestRepo(unittest.TestCase):
 
     def test_next_special_day_merges_holidays_and_anniversaries(self):
         html = (PKG / 'frontend' / 'workday.html').read_text(encoding='utf-8')
-        for token in ('function nextSpecialDay()', '距离下一个节假日和纪念日',
+        for token in ('function nextSpecialDay()', '<div class="lbl">距离</div>',
                       'S.workday.anniversaries', 'h.off || []'):
             self.assertIn(token, html)
         self.assertNotIn('next_holiday', html)
