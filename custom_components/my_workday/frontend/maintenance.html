@@ -195,11 +195,10 @@
         '<b>' + M.esc(i.name) + '</b>' +
         (i.note ? '<span class="item-note">' + M.esc(i.note) + '</span>' : '') +
         pill(st.status) + '</div>' +
-        '<div class="meta">上次维护：' + M.esc(i.last_date || '未设') + ' · ' + left +
+        '<button class="ghost item-meta-toggle" data-rectoggle="' + M.esc(i.id) + '">上次维护：' +
+        M.esc(i.last_date || '未设') + ' · ' + left +
         (p.need_counter && st.remaining_counter != null ? ' · 还剩 ' + st.remaining_counter + ' ' + M.esc(p.counter_unit || '') : '') +
-        '</div>' +
-        (recs.length ? '<div class="acts"><button class="ghost rec-toggle" data-rectoggle="' + M.esc(i.id) +
-          '">维护记录 (' + recs.length + ') ' + (open ? '▴' : '▸') + '</button></div>' : '') +
+        ' ' + (open ? '▴' : '▸') + '</button>' +
         (open && recHtml ? '<div class="sub-list item-records">' + recHtml + '</div>' : '') +
         '</div>';
     }).join('') || '<div class="hint">还没有维护小项。</div>';

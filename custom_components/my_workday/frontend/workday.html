@@ -8,6 +8,7 @@
 </head>
 <body>
 <div id="msg" class="msg" hidden></div>
+<div id="cellTip" class="cell-tip" hidden></div>
 <div id="cellMenu" class="menu" hidden></div>
 <main>
   <section class="stats" id="stats"><div class="stat"><div class="num">—</div><div class="lbl">正在加载…</div></div><div class="stat"><div class="num">—</div><div class="lbl">正在加载…</div></div><div class="stat"><div class="num">—</div><div class="lbl">正在加载…</div></div></section>
@@ -306,6 +307,7 @@
     return { todos: todos, anns: anns, dues: dues };
   }
   function renderCal() {
+    hideTip();
     var ys = $('calYear'), ms = $('calMonth');
     var baseY = M.dateOf(S.today).getFullYear(), years = [];
     for (var yy = Math.min(baseY - 3, year); yy <= Math.max(baseY + 3, year); yy++) years.push(yy);
@@ -337,7 +339,7 @@
       if (open.length) corner += '<span class="ct">待</span>';
       if (d.anns.length) corner += '<span class="ct ann">纪</span>';
       var marks = d.dues.length ? '<span class="mark">' + d.dues.length + '</span>' : '';
-      html += '<div class="' + cls + '" data-iso="' + key + '" title="' + M.esc(parts.join(' / ')) + '">' +
+      html += '<div class="' + cls + '" data-iso="' + key + '" data-tip="' + M.esc(parts.join('\n')) + '">' +
         (corner ? '<span class="corner">' + corner + '</span>' : '') +
         '<span class="d">' + day.getDate() + '</span>' +
         (dayLabel(key) ? '<span class="lbl">' + M.esc(dayLabel(key)) + '</span>' : '') +
@@ -378,6 +380,25 @@
     });
     if (rows) h += '<div class="menu-existing">' + rows + '</div>';
     return h;
+  }
+  function hideTip() { $('cellTip').hidden = true; }
+  function showTip(cell, x, y) {
+    var raw = cell.dataset.tip || '';
+    if (!raw) { hideTip(); return; }
+    var el = $('cellTip');
+    el.innerHTML = raw.split('\n').filter(function (line) { return line; }).map(function (line) {
+      var cls = line.indexOf('待办：') === 0 ? 'tip-todo' :
+                line.indexOf('纪念：') === 0 ? 'tip-ann' : 'tip-due';
+      return '<div class="' + cls + '">' + M.esc(line) + '</div>';
+    }).join('');
+    el.hidden = false;
+    positionTip(x, y);
+  }
+  function positionTip(x, y) {
+    var el = $('cellTip');
+    var w = el.offsetWidth || 240, h = el.offsetHeight || 80;
+    el.style.left = Math.max(8, Math.min((x || 0) + 14, window.innerWidth - w - 10)) + 'px';
+    el.style.top = Math.max(8, Math.min((y || 0) + 16, window.innerHeight - h - 10)) + 'px';
   }
   function openMenu(key, x, y) {
     if (!S) return;
@@ -477,6 +498,18 @@
     if (e.target.closest && e.target.closest('[data-jump-today]')) { jumpToday(); return; }
     if (e.target.closest && e.target.closest('[data-jump-event]')) jumpToEvent();
   };
+  $('cal').addEventListener('mouseover', function (e) {
+    var cell = e.target.closest && e.target.closest('[data-tip]');
+    if (!cell) { hideTip(); return; }
+    showTip(cell, e.clientX, e.clientY);
+  });
+  $('cal').addEventListener('mousemove', function (e) {
+    if (!$('cellTip').hidden) positionTip(e.clientX, e.clientY);
+  });
+  $('cal').addEventListener('mouseout', function (e) {
+    var cell = e.target.closest && e.target.closest('[data-tip]');
+    if (cell) hideTip();
+  });
   $('cal').onclick = function (e) {
     if (suppressClick) { suppressClick = false; return; }
     var cell = e.target.closest('[data-iso]'); if (!cell || !S) return;

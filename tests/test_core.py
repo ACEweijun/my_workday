@@ -509,8 +509,8 @@ class TestRepo(unittest.TestCase):
     def test_item_own_records_clickable(self):
         m = (PKG / 'frontend' / 'maintenance.html').read_text(encoding='utf-8')
         for token in ('function itemRecords(', 'data-recitem=', 'item-records',
-                      'data-rectoggle=', 'itemOpen', '维护记录 (',
-                      'class="item-note"',
+                      'data-rectoggle=', 'itemOpen', 'class="item-note"',
+                      'item-meta-toggle', '上次维护：',
                       'openRecForm(recordId, focusItem)', 'id="recFocus"',
                       '编辑这条维护记录', '移除这条记录', 'renderRecEntries(p, rec, focusItem)',
                       'if (!focus || e.item_id === focus)'):
@@ -518,6 +518,18 @@ class TestRepo(unittest.TestCase):
         css = (PKG / 'frontend' / 'shared.css').read_text(encoding='utf-8')
         self.assertIn('.item-records{', css)
         self.assertIn('.item-note{', css)
+        self.assertNotIn('维护记录 (', m)
+
+    def test_cell_tooltip_multiline(self):
+        w = (PKG / 'frontend' / 'workday.html').read_text(encoding='utf-8')
+        for token in ('id="cellTip"', 'data-tip=', "parts.join('\\n')",
+                      'function showTip(', 'function positionTip(',
+                      "'mouseover'", "'mousemove'", "'mouseout'", 'tip-todo'):
+            self.assertIn(token, w)
+        self.assertNotIn("parts.join(' / ')", w)
+        css = (PKG / 'frontend' / 'shared.css').read_text(encoding='utf-8')
+        self.assertIn('.cell-tip{', css)
+        self.assertIn('.cell-tip div+div{', css)
 
     def test_frontend_routing_and_ws_snapshot(self):
         init = (PKG / '__init__.py').read_text(encoding='utf-8')
