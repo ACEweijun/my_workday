@@ -260,6 +260,53 @@ class TestRepo(unittest.TestCase):
         self.assertIn('if (!armed)', html)
         self.assertNotIn("write('delete_project', { slug: target }).then(function ()", html)
 
+    def test_backend_next_special_day(self):
+        h = {'off': {'2027-01-01'}, 'names': {'2027-01-01': '元旦'}, 'makeup': set()}
+        anns = [{'name': '结婚纪念日', 'date': '11-16', 'repeat': True}]
+        found = wd.next_special_day(dt.date(2026, 11, 15), h, anns)
+        self.assertEqual(found['name'], '结婚纪念日')
+        self.assertEqual(found['days'], 1)
+        self.assertEqual(found['kind'], '纪念日')
+        self.assertIn('next_event', (PKG / 'coordinator.py').read_text(encoding='utf-8'))
+        w = (PKG / 'frontend' / 'workday.html').read_text(encoding='utf-8')
+        self.assertIn('workday.next_event', w)
+
+    def test_menu_two_stage_and_order(self):
+        w = (PKG / 'frontend' / 'workday.html').read_text(encoding='utf-8')
+        for token in ('data-madd', 'menuAdding', 'menu-existing', 'menu-add'):
+            self.assertIn(token, w)
+        self.assertLess(w.index("'+ 新增'"), w.index('menu-existing'))
+        self.assertNotIn('这天还没有安排', w)
+        self.assertNotIn('id="thisM"', w)
+        self.assertNotIn('<header class="bar">', w)
+
+    def test_top_bars_removed_and_modal(self):
+        m = (PKG / 'frontend' / 'maintenance.html').read_text(encoding='utf-8')
+        for token in ('id="projMask"', 'class="modal"', 'id="projClose"',
+                      "$('projMask').hidden = false", 'projMask', 'resetForms'):
+            self.assertIn(token, m)
+        self.assertNotIn('<header class="bar">', m)
+        self.assertNotIn('taskLabel', m)
+        self.assertNotIn("$('projForm')", m)
+        self.assertIn('.modal-mask', (PKG / 'frontend' / 'shared.css').read_text(encoding='utf-8'))
+
+    def test_guards_and_validations(self):
+        w = (PKG / 'frontend' / 'workday.html').read_text(encoding='utf-8')
+        m = (PKG / 'frontend' / 'maintenance.html').read_text(encoding='utf-8')
+        for token in ('fingerprint(', '数据已被其他页面修改', 'armDel(', 'customDirty',
+                      '日期格式应为', '无放假数据'):
+            self.assertIn(token, w)
+        for token in ('请填写有效的计数值', '间隔天数要填', '维护日期要填',
+                      'btn.disabled = true', '确认删除'):
+            self.assertIn(token, m)
+
+    def test_font_and_mobile_css(self):
+        css = (PKG / 'frontend' / 'shared.css').read_text(encoding='utf-8')
+        for token in ('--fs:', '--tap:', 'var(--fs)', 'month-nav', 'month-center',
+                      'nav-arrow', '@media (max-width:620px)', 'stat[data-jump-today]:hover'):
+            self.assertIn(token, css)
+        self.assertIn('.mt-side .tab.add', css)
+
     def test_frontend_routing_and_ws_snapshot(self):
         init = (PKG / '__init__.py').read_text(encoding='utf-8')
         self.assertIn('FrontendFileView', init)

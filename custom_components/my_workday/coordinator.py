@@ -92,6 +92,7 @@ class MergedCoordinator(DataUpdateCoordinator):
         stats = wd.month_stats(now.year, now.month, now, holidays,
                                custom_work, custom_rest)
         holiday = wd.next_holiday(now, holidays)
+        event = wd.next_special_day(now, holidays, anniversaries)
         projects = raw["maintenance"].get("projects") or []
         summaries = [mnt.project_summary(p, now, self.soon_days) for p in projects]
         due_items = mnt.all_due_items(projects, now, self.soon_days)
@@ -107,6 +108,7 @@ class MergedCoordinator(DataUpdateCoordinator):
                 "tomorrow_work": tomorrow_work,
                 "stats": stats,
                 "next_holiday": holiday,
+                "next_event": event,
                 "custom_work": sorted(custom_work),
                 "custom_rest": sorted(custom_rest),
                 "todos": todos,

@@ -7,10 +7,6 @@
 <link rel="stylesheet" href="shared.css">
 </head>
 <body>
-<header class="bar">
-  <b>维护台账</b>
-  <span class="date" id="taskLabel"></span>
-</header>
 <div id="msg" class="msg" hidden></div>
 <div id="projMenu" class="menu" hidden></div>
 
@@ -24,29 +20,7 @@
         <div><label id="counterLabel">当前计数</label><input type="number" id="counterValue"></div>
         <div class="full hint">离开输入框自动保存。不计数项目不显示这一块。</div>
       </div>
-      <div class="form" id="projForm" hidden>
-        <div class="full"><b id="projFormTitle">新建维护项目</b></div>
-        <div id="projStep1">
-          <div><label>项目名称</label><input id="projName" placeholder="卡罗拉"></div>
-          <div><label>英文标识（中文名必填）</label><input id="projSlug" placeholder="corolla"></div>
-          <div><label>类型（决定预置小项）</label><select id="projType">
-            <option value="vehicle">车辆</option><option value="appliance">家电</option>
-            <option value="furniture">家具</option><option value="area">区域</option>
-            <option value="custom">自己建</option></select></div>
-          <div><label>这个项目要计数吗</label><select id="projCounter">
-            <option value="0">不要</option><option value="1">要</option></select></div>
-          <div class="full"><button class="primary" id="projNext">下一步</button>
-            <button class="ghost" id="projCancel">取消</button></div>
-        </div>
-        <div id="projStep2" hidden>
-          <div><label>计数单位</label><input id="projUnit" placeholder="公里 / 次 / 小时"></div>
-          <div><label>在界面上叫它什么（可留空）</label><input id="projUnitLabel" placeholder="留空按单位推断"></div>
-          <div class="full"><button class="primary" id="projSave">创建</button>
-            <button class="ghost" id="projBack">上一步</button>
-            <button class="ghost" id="projCancel2">取消</button></div>
-        </div>
-      </div>
-      <div class="hint" id="projHint">还没有项目，点右侧「+ 新建」。</div>
+      <div class="hint" id="projHint">还没有项目，点「+ 新建」。</div>
     </section>
 
     <section class="card">
@@ -85,13 +59,46 @@
   <aside class="mt-side" id="projSide"></aside>
 </main>
 
+<div class="modal-mask" id="projMask" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="projFormTitle">
+    <div class="modal-head"><b id="projFormTitle">新建维护项目</b>
+      <button class="ghost" id="projClose" aria-label="关闭">×</button></div>
+    <div class="modal-body">
+      <div id="projStep1">
+        <div><label>项目名称</label><input id="projName" placeholder="卡罗拉"></div>
+        <div><label>英文标识（中文名必填）</label><input id="projSlug" placeholder="corolla"></div>
+        <div><label>类型（决定预置小项）</label><select id="projType">
+          <option value="vehicle">车辆</option><option value="appliance">家电</option>
+          <option value="furniture">家具</option><option value="area">区域</option>
+          <option value="custom">自己建</option></select></div>
+        <div><label>这个项目要计数吗</label><select id="projCounter">
+          <option value="0">不要</option><option value="1">要</option></select></div>
+        <div class="full"><button class="primary" id="projNext">下一步</button>
+          <button class="ghost" id="projCancel">取消</button></div>
+      </div>
+      <div id="projStep2" hidden>
+        <div><label>计数单位</label><input id="projUnit" placeholder="公里 / 次 / 小时"></div>
+        <div><label>在界面上叫它什么（可留空）</label><input id="projUnitLabel" placeholder="留空按单位推断"></div>
+        <div class="full"><button class="primary" id="projSave">创建</button>
+          <button class="ghost" id="projBack">上一步</button>
+          <button class="ghost" id="projCancel2">取消</button></div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script src="shared.js"></script>
 <script>
 (function () {
   'use strict';
   var M = window.MW, $ = M.$, S = null, busy = false, slug = null, expanded = {}, retries = 0;
   var menuSlug = null, editingSlug = null, deleteArmed = false, longTimer = null, touchXY = null;
-  var lastCount = null;
+  var lastCount = null, pendingDel = null;
+  function armDel(k) {
+    if (pendingDel !== k) { pendingDel = k; return false; }
+    pendingDel = null; return true;
+  }
+  function delText(k) { return pendingDel === k ? '确认删除' : '删除'; }
 
   function retryLoad() {
     if (retries >= 3) return;
@@ -140,14 +147,14 @@
     setTimeout(function () { URL.revokeObjectURL(a.href); }, 2000);
   }
   function resetForms() {
-    ['projForm', 'logForm', 'itemForm'].forEach(function (id) { $(id).hidden = true; });
+    ['projMask', 'logForm', 'itemForm'].forEach(function (id) { $(id).hidden = true; });
+    pendingDel = null;
     $('projStep1').hidden = false; $('projStep2').hidden = true;
     $('itemId').value = '';
     editingSlug = null; deleteArmed = false;
     closeMenu();
   }
   function render() {
-    $('taskLabel').textContent = '今天要做 ' + S.tasks_today + ' 件';
     renderSide(); renderOverview(); renderItems(); renderHistory(); renderLogItems();
     if (menuSlug) renderMenu();
   }
@@ -211,7 +218,7 @@
         '<button data-baseline="' + M.esc(i.id) + '">设基准</button>' +
         '<button data-logone="' + M.esc(i.id) + '">记录</button>' +
         '<button data-history="' + M.esc(i.id) + '">维护记录 (' + recs.length + ') ' + (expanded[i.id] ? '▴' : '▾') + '</button>' +
-        '<button class="danger" data-del="' + M.esc(i.id) + '">删除</button></div>';
+        '<button class="danger" data-del="' + M.esc(i.id) + '">' + delText('item:' + i.id) + '</button></div>';
       if (!expanded[i.id]) return head + '</div>';
       var rows = recs.length ? recs.map(function (r) {
         var e = (r.entries || []).filter(function (x) { return x.item_id === i.id; })[0] || {};
@@ -238,6 +245,7 @@
         '<span class="txt">' + M.esc(names.join('、')) + '</span>' +
         '<span class="sub">' + M.esc(r.counter == null ? '' : r.counter) + '</span></div>';
     }).join('') : '<div class="hint">还没有维护记录。</div>';
+    if (rows.length > 30) $('history').innerHTML += '<div class="hint">还有 ' + (rows.length - 30) + ' 次未显示</div>';
   }
   function renderLogItems() {
     var p = project(); if (!p) { $('logItems').innerHTML = ''; return; }
@@ -274,7 +282,7 @@
   function openForm(edit) {
     resetForms();
     editingSlug = edit ? slug : null;
-    $('projForm').hidden = false;
+    $('projMask').hidden = false;
     $('projFormTitle').textContent = edit ? '编辑项目' : '新建维护项目';
     $('projStep1').hidden = false; $('projStep2').hidden = true;
     var p = project();
@@ -302,7 +310,7 @@
     if (!name) { M.toast('项目名称不能为空', true); return; }
     if (!editingSlug && !pslug) { M.toast('中文项目名需要填英文标识', true); return; }
     var data = { name: name, need_counter: need, counter_unit: need ? unit : '', counter_label: need ? label : '' };
-    $('projForm').hidden = true;
+    $('projMask').hidden = true;
     if (editingSlug) {
       data.slug = editingSlug;
       editingSlug = null;
@@ -375,9 +383,13 @@
   $('projSave').onclick = submitProject;
   $('projCancel').onclick = resetForms;
   $('projCancel2').onclick = resetForms;
+  $('projClose').onclick = resetForms;
+  $('projMask').onclick = function (e) { if (e.target === this) resetForms(); };
   $('counterValue').onchange = function () {
     var p = project(); if (!p) return;
-    write('set_counter', { slug: p.slug, value: Number($('counterValue').value) });
+    var raw = String($('counterValue').value == null ? '' : $('counterValue').value).trim();
+    if (raw === '' || !isFinite(Number(raw))) { M.toast('请填写有效的计数值', true); return; }
+    write('set_counter', { slug: p.slug, value: Number(raw) });
   };
   $('logOpen').onclick = function () {
     var f = $('logForm'); f.hidden = !f.hidden;
@@ -391,6 +403,7 @@
   $('logSave').onclick = function () {
     var ids = Array.prototype.slice.call(document.querySelectorAll('[data-logitem]:checked')).map(function (x) { return x.value; });
     if (!ids.length) { M.toast('至少勾选一个小项', true); return; }
+    if (!$('logDate').value) { M.toast('维护日期要填', true); return; }
     var notes = {};
     Array.prototype.slice.call(document.querySelectorAll('[data-lognote]')).forEach(function (x) {
       notes[x.dataset.lognote] = x.value;
@@ -398,7 +411,8 @@
     var data = { slug: slug, item_ids: ids, date: $('logDate').value, item_notes: notes };
     if ($('logCounter').value !== '') data.counter = Number($('logCounter').value);
     $('logForm').hidden = true;
-    write('log_service', data);
+    var btn = this; btn.disabled = true;
+    write('log_service', data).finally(function () { btn.disabled = false; });
   };
   $('itemAdd').onclick = function () {
     $('itemForm').hidden = false; $('itemId').value = '';
@@ -412,6 +426,7 @@
       interval_days: Number($('itemDays').value), note: $('itemNote').value };
     if ($('itemInterval').value !== '') data.interval_counter = Number($('itemInterval').value);
     if (!data.name) { M.toast('维护内容不能为空', true); return; }
+    if (String($('itemDays').value == null ? '' : $('itemDays').value).trim() === '') { M.toast('间隔天数要填', true); return; }
     if (id) { data.item_id = id; write('update_item', data); }
     else write('add_item', data);
     $('itemForm').hidden = true;
@@ -429,7 +444,10 @@
       return;
     }
     var del = t.dataset.del;
-    if (del) { write('delete_item', { slug: slug, item_id: del }); return; }
+    if (del) {
+      if (!armDel('item:' + del)) { renderItems(); return; }
+      write('delete_item', { slug: slug, item_id: del }); return;
+    }
     var one = t.dataset.logone;
     if (one) {
       $('logForm').hidden = false;
@@ -477,7 +495,9 @@
     }
   };
   document.addEventListener('keydown', function (e) {
-    if (e.key === 'Escape' && !$('projMenu').hidden) closeMenu();
+    if (e.key !== 'Escape') return;
+    if (!$('projMenu').hidden) closeMenu();
+    if (!$('projMask').hidden) resetForms();
   });
   M.onUpdate(load);
   M.start();

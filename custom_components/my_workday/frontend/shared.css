@@ -122,3 +122,53 @@ main{max-width:920px;margin:0 auto;padding:14px;display:flex;flex-direction:colu
 @media (max-width:620px){.mt-layout{flex-direction:column}.mt-side{width:100%;order:-1;position:static;flex-direction:row;overflow-x:auto;gap:6px;padding-bottom:4px}.mt-side .tab{width:auto;flex:none}.fold{padding:10px}.fold-body{padding:10px}}
 
 .stat .sub2{font-size:10px;color:var(--muted);margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+:root{--fs:15px;--fs-sm:12.5px;--fs-num:23px;--fs-mini:11px;--tap:38px}
+body{font-size:var(--fs);line-height:1.55}
+button{min-height:var(--tap);font-size:var(--fs-sm)}
+input,textarea,select{font-size:var(--fs-sm);min-height:var(--tap)}
+textarea{font-size:var(--fs-sm)}
+.card h2,.fold b{font-size:calc(var(--fs) + 1px)}
+.stat .num{font-size:var(--fs-num)}
+.stat .lbl,.stat .sub2{font-size:var(--fs-mini)}
+.hint,.row .sub,.group,.form label,.mt-item .meta,.item .meta,.logtable,.msg{font-size:var(--fs-sm)}
+.cal-head div,.cell .lbl,.cell .todo1,.cell .ct,.cell .cnt,.cell .mark,.pill,.badge{font-size:var(--fs-mini)}
+.cell{font-size:var(--fs-sm)}
+.menu .mrow{font-size:var(--fs-sm)}
+.menu button{min-height:30px;font-size:var(--fs-mini)}
+.menu input.mini,.menu #menuInput{font-size:var(--fs-sm)}
+.stat[data-jump-today]{transition:background .15s;cursor:pointer}
+.stat[data-jump-today]:hover{background:var(--accent-soft)}
+.stat[data-jump-today]:active{background:var(--soft)}
+.month-nav{justify-content:space-between;gap:8px}
+.month-center{display:flex;gap:8px;justify-content:center;align-items:center;flex:1}
+.month-center select{min-width:96px;text-align:center}
+.nav-arrow{min-width:60px;font-size:22px;line-height:1;padding:8px 0}
+.modal-mask{position:fixed;inset:0;z-index:60;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;padding:16px}
+.modal{width:min(480px,100%);max-height:86vh;overflow:auto;background:var(--surface);border:.5px solid var(--line);border-radius:var(--radius);box-shadow:0 12px 40px rgba(0,0,0,.25)}
+.modal-head{display:flex;align-items:center;gap:8px;padding:14px 16px;border-bottom:.5px solid var(--line)}
+.modal-head b{flex:1;font-size:16px;font-weight:500}
+.modal-body{padding:14px 16px}
+.modal-body>div>div{margin-bottom:10px}
+.modal-body .full{margin-bottom:0}
+.menu .menu-add{margin:2px 0 6px}
+.menu .menu-add button{width:100%;text-align:left}
+.menu .types{margin:6px 0}
+.menu .menu-existing{margin-top:8px;border-top:.5px solid var(--line);padding-top:2px}
+.menu .modes{border-top:.5px solid var(--line);padding-top:8px;margin-top:10px}
+@media (max-width:620px){
+  :root{--fs:14px;--fs-sm:12px;--fs-num:19px;--fs-mini:10px;--tap:40px}
+  main{padding:10px;gap:10px}
+  .card{padding:11px}
+  .cell{min-height:46px;font-size:11px}
+  .stats .stat{padding:10px 4px}
+  .stat .sub2{white-space:normal;word-break:break-all}
+  .month-center select{min-width:78px}
+  .nav-arrow{min-width:48px;font-size:20px}
+  .menu{width:min(288px,calc(100vw - 24px))}
+  .modal{width:calc(100vw - 24px);max-height:88vh}
+  .mt-side{flex-wrap:wrap}
+  .mt-side .tab.add{flex-basis:100%;width:100%;order:2;position:static}
+  .fold{padding:10px}
+  .fold-body{padding:10px}
+}

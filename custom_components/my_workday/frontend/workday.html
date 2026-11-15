@@ -7,25 +7,22 @@
 <link rel="stylesheet" href="shared.css">
 </head>
 <body>
-<header class="bar">
-  <b>我的工作日</b>
-</header>
 <div id="msg" class="msg" hidden></div>
 <div id="cellMenu" class="menu" hidden></div>
 <main>
-  <section class="stats" id="stats"></section>
+  <section class="stats" id="stats"><div class="stat"><div class="num">—</div><div class="lbl">正在加载…</div></div><div class="stat"><div class="num">—</div><div class="lbl">正在加载…</div></div><div class="stat"><div class="num">—</div><div class="lbl">正在加载…</div></div></section>
 
   <section class="card">
-    <div class="card-head">
-      <select id="calYear" class="mini"></select>
-      <select id="calMonth" class="mini"></select>
-      <span class="spacer"></span>
-      <button class="ghost" id="prevM">‹</button>
-      <button class="ghost" id="thisM">本月</button>
-      <button class="ghost" id="nextM">›</button>
+    <div class="card-head month-nav">
+      <button class="ghost nav-arrow" id="prevM" aria-label="上个月">‹</button>
+      <div class="month-center">
+        <select id="calYear" class="mini"></select>
+        <select id="calMonth" class="mini"></select>
+      </div>
+      <button class="ghost nav-arrow" id="nextM" aria-label="下个月">›</button>
     </div>
     <div class="cal-head" id="calHead"></div>
-    <div class="cal" id="cal"></div>
+    <div class="cal" id="cal"><div class="hint" style="padding:20px">正在加载日历…</div></div>
     <div class="hint" id="sourceLabel" style="margin-top:8px"></div>
   </section>
 
@@ -75,7 +72,8 @@
 (function () {
   'use strict';
   var M = window.MW, $ = M.$, S = null, busy = false, year, month, retries = 0;
-  var menuDate = null, menuType = null, selectedCell = null, suppressClick = false, touchTimer = null, touchXY = null;
+  var menuDate = null, menuType = null, menuAdding = false, selectedCell = null, suppressClick = false, touchTimer = null, touchXY = null;
+  var pendingDel = null, customDirty = false;
   var FOLD_KEY = 'my_workday_fold2', fold = {};
   try { fold = JSON.parse(localStorage.getItem(FOLD_KEY) || '{}') || {}; } catch (e) { fold = {}; }
 
@@ -101,9 +99,29 @@
       retryLoad();
     }).finally(function () { busy = false; });
   }
-  function write(service, data) {
-    return M.call(service, data).then(load).catch(function (e) { M.toast(e.message, true); });
+  var FULL_WRITE = { set_todos: 1, set_anniversaries: 1, set_custom: 1, set_day: 1 };
+  function fingerprint(w) {
+    return JSON.stringify([w.todos || [], w.anniversaries || [], w.custom_work || [], w.custom_rest || []]);
   }
+  function write(service, data) {
+    var pre = FULL_WRITE[service]
+      ? M.snapshot().then(function (fresh) {
+          if (!fresh || !fresh.workday || !S) return;
+          if (fingerprint(fresh.workday) !== fingerprint(S.workday)) {
+            S = fresh;
+            throw new Error('数据已被其他页面修改，本次写入已取消，请重试');
+          }
+        })
+      : Promise.resolve();
+    return pre.then(function () { return M.call(service, data); })
+      .then(load).catch(function (e) { M.toast(e.message, true); });
+  }
+  function armDel(kind, id) {
+    var k = kind + ':' + id;
+    if (pendingDel !== k) { pendingDel = k; return false; }
+    pendingDel = null; return true;
+  }
+  function delText(kind, id) { return pendingDel === kind + ':' + id ? '确认删除' : '×'; }
   function iso(d) {
     return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
   }
@@ -125,6 +143,10 @@
     return { total: total, left: left };
   }
   function nextSpecialDay() {
+    var ne = S.workday && S.workday.next_event;
+    if (ne && ne.name) {
+      return { date: ne.date || S.today, name: ne.name, days: Number(ne.days) || 0 };
+    }
     var t = S.today, h = S.holidays || {}, names = h.names || {}, best = null;
     function consider(date, name) {
       if (!date || date < t) return;
@@ -181,8 +203,11 @@
         '<div class="num">' + (w.today_work ? '上班' : '休息') + '</div>' +
         '<div class="lbl">今天 · ' + S.today + ' · ' + M.esc(w.today_label || '') + '</div></div>' +
       '<div class="stat">' + third + '</div>';
+    var h = S.holidays || {}, hasYear = (h.off || []).concat(h.makeup || [])
+      .some(function (d) { return Number(String(d).slice(0, 4)) === year; });
     $('sourceLabel').textContent = '放假数据：' +
-      ({ network: 'holiday-cn 自动获取', manual: '手工覆盖', fallback: '未获取到，按周末规则降级' }[w.holiday_source] || '未获取到');
+      ({ network: 'holiday-cn 自动获取', manual: '手工覆盖', fallback: '未获取到，按周末规则降级' }[w.holiday_source] || '未获取到') +
+      (hasYear ? '' : ' · ' + year + ' 年无放假数据，按周末规则');
   }
   function jumpToday() {
     var t = M.dateOf(S.today);
@@ -197,6 +222,11 @@
     var todos = (S.workday.todos || []).filter(function (t) { return t.date === key; });
     var anns = (S.workday.anniversaries || []).filter(function (a) { return annOn(a, key); });
     var dues = (S.maintenance.due_items || []).filter(function (d) { return d.due_date === key; });
+    if (key === S.today) {
+      (S.maintenance.due_items || []).forEach(function (d) {
+        if (d.status === 'due' && d.due_date < key && dues.indexOf(d) < 0) dues.push(d);
+      });
+    }
     return { todos: todos, anns: anns, dues: dues };
   }
   function renderCal() {
@@ -209,16 +239,21 @@
       .map(function (d) { return '<div>' + d + '</div>'; }).join('');
     var first = new Date(year, month - 1, 1);
     var offset = (first.getDay() + 6) % 7;
+    var daysInMonth = new Date(year, month, 0).getDate();
+    var weeks = Math.ceil((offset + daysInMonth) / 7);
     var start = new Date(year, month - 1, 1 - offset);
     var html = '';
-    for (var i = 0; i < 42; i++) {
+    for (var i = 0; i < weeks * 7; i++) {
       var day = new Date(start); day.setDate(start.getDate() + i);
       var key = iso(day), c = classify(day), d = cellData(key);
       var open = d.todos.filter(function (t) { return !t.done; });
       var parts = [];
       open.forEach(function (t) { parts.push('待办：' + t.text); });
       d.anns.forEach(function (a) { parts.push('纪念：' + a.name); });
-      d.dues.forEach(function (x) { parts.push('维护：' + x.project + ' · ' + x.name); });
+      d.dues.forEach(function (x) {
+        var late = x.due_date < key && x.status === 'due' ? '（逾期 ' + M.dayDiff(key, x.due_date) + ' 天）' : '';
+        parts.push('维护：' + x.project + ' · ' + x.name + late);
+      });
       var cls = 'cell ' + (c.work ? 'work' : 'rest') +
         (day.getMonth() + 1 !== month || day.getFullYear() !== year ? ' out' : '') +
         (key === S.today ? ' today' : '') + (key === selectedCell ? ' sel' : '');
@@ -241,30 +276,35 @@
     var d = cellData(menuDate);
     var h = '<h3><button class="ghost" data-mclose style="float:right;padding:1px 7px">×</button>' +
       M.esc(menuDate) + '</h3>';
+    h += '<div class="menu-add"><button class="primary" data-madd>' +
+      (menuAdding ? '收起新增' : '+ 新增') + '</button></div>';
+    if (menuAdding) {
+      h += '<div class="types"><button data-mtype="todo" class="' + (menuType === 'todo' ? 'on' : '') + '">待办</button>' +
+        '<button data-mtype="ann" class="' + (menuType === 'ann' ? 'on' : '') + '">纪念日</button></div>';
+      if (menuType === 'todo') {
+        h += '<input id="menuInput" placeholder="要做什么，回车保存"><div class="hint">回车保存 · Esc 关闭</div>';
+      } else if (menuType === 'ann') {
+        h += '<input id="menuInput" placeholder="名称，如 生日">' +
+          '<label class="hint" style="display:block;margin-top:6px"><input type="checkbox" id="menuRepeat" style="width:auto" checked> 每年重复（只记月日）</label>';
+      }
+    }
+    var rows = '';
     d.todos.forEach(function (t) {
-      h += '<div class="mrow"><span class="mkind">待</span>' +
+      rows += '<div class="mrow"><span class="mkind">待</span>' +
         '<span class="mt' + (t.done ? ' done' : '') + '" data-mtodo-edit="' + M.esc(t.id) + '" title="点击改文字">' + M.esc(t.text) + '</span>' +
         '<button data-mtodo-done="' + M.esc(t.id) + '">' + (t.done ? '恢复' : '完成') + '</button>' +
-        '<button class="danger" data-mtodo-del="' + M.esc(t.id) + '">×</button></div>';
+        '<button class="danger" data-mtodo-del="' + M.esc(t.id) + '">' + delText('todo', t.id) + '</button></div>';
     });
     d.anns.forEach(function (a) {
-      h += '<div class="mrow"><span class="mkind ann">纪</span>' +
+      rows += '<div class="mrow"><span class="mkind ann">纪</span>' +
         '<span class="mt" data-mann-edit="' + M.esc(a.id) + '" title="点击改名称">' + M.esc(a.name) + '</span>' +
-        '<button class="danger" data-mann-del="' + M.esc(a.id) + '">×</button></div>';
+        '<button class="danger" data-mann-del="' + M.esc(a.id) + '">' + delText('ann', a.id) + '</button></div>';
     });
     d.dues.forEach(function (x) {
-      h += '<div class="mrow"><span class="mkind due">维</span><span class="mt">' +
+      rows += '<div class="mrow"><span class="mkind due">维</span><span class="mt">' +
         M.esc(x.project + ' · ' + x.name) + '</span></div>';
     });
-    if (!d.todos.length && !d.anns.length && !d.dues.length) h += '<div class="hint">这天还没有安排。</div>';
-    h += '<div class="types"><button data-mtype="todo" class="' + (menuType === 'todo' ? 'on' : '') + '">待办</button>' +
-      '<button data-mtype="ann" class="' + (menuType === 'ann' ? 'on' : '') + '">纪念日</button></div>';
-    if (menuType === 'todo') {
-      h += '<input id="menuInput" placeholder="要做什么，回车保存"><div class="hint">不选类型或留空回车不会写入 · Esc 关闭</div>';
-    } else if (menuType === 'ann') {
-      h += '<input id="menuInput" placeholder="名称，如 生日">' +
-        '<label class="hint" style="display:block;margin-top:6px"><input type="checkbox" id="menuRepeat" style="width:auto" checked> 每年重复（只记月日）</label>';
-    }
+    if (rows) h += '<div class="menu-existing">' + rows + '</div>';
     var cm = customMode(menuDate), bw = baseWork(menuDate);
     var curWork = cm ? cm === 'work' : bw;
     var modes = '';
@@ -276,7 +316,7 @@
   }
   function openMenu(key, x, y) {
     if (!S) return;
-    menuDate = key; menuType = null;
+    menuDate = key; menuType = null; menuAdding = false; pendingDel = null;
     var el = $('cellMenu');
     el.hidden = false;
     el.innerHTML = menuHtml();
@@ -286,7 +326,7 @@
   }
   function closeMenu() {
     $('cellMenu').hidden = true;
-    menuDate = null; menuType = null;
+    menuDate = null; menuType = null; menuAdding = false; pendingDel = null;
   }
   function saveAnns(next) { return write('set_anniversaries', { anniversaries: next }); }
   function inlineEdit(row, id, oldText, kind) {
@@ -338,7 +378,7 @@
         html += '<div class="row' + (t.done ? ' done' : '') + '">' +
           '<input type="checkbox" style="width:auto" data-todo-check="' + M.esc(t.id) + '"' + (t.done ? ' checked' : '') + '>' +
           '<span class="txt">' + M.esc(t.text) + '</span><span class="sub">' + sub + '</span>' +
-          '<button class="ghost danger" data-todo-del="' + M.esc(t.id) + '">×</button></div>';
+          '<button class="ghost danger" data-todo-del="' + M.esc(t.id) + '">' + delText('todo', t.id) + '</button></div>';
       });
     });
     $('todos').innerHTML = html || '<div class="hint">还没有待办。</div>';
@@ -350,13 +390,13 @@
     $('anns').innerHTML = list.length ? list.map(function (a) {
       return '<div class="row"><span class="txt">' + M.esc(a.name) + '</span>' +
         '<span class="sub">' + M.esc(a.date) + (a.repeat ? ' · 每年' : '') + '</span>' +
-        '<button class="ghost danger" data-ann-del="' + M.esc(a.id) + '">×</button></div>';
+        '<button class="ghost danger" data-ann-del="' + M.esc(a.id) + '">' + delText('ann', a.id) + '</button></div>';
     }).join('') : '<div class="hint">还没有纪念日。</div>';
   }
   function renderCustom() {
     var w = S.workday;
     $('customSummary').textContent = '上班 ' + (w.custom_work || []).length + ' · 休息 ' + (w.custom_rest || []).length;
-    $('customText').value = '上班: ' + (w.custom_work || []).join(',') + '\n休息: ' + (w.custom_rest || []).join(',');
+    if (!customDirty) $('customText').value = '上班: ' + (w.custom_work || []).join(',') + '\n休息: ' + (w.custom_rest || []).join(',');
   }
   function renderDue() {
     var list = S.maintenance.due_items || [];
@@ -367,6 +407,7 @@
         '<span class="txt">' + M.esc(d.project) + ' · ' + M.esc(d.name) + '</span>' +
         '<span class="sub">' + M.esc(d.due_date) + '</span></div>';
     }).join('') : '<div class="hint">目前没有到期或快到期的维护项。</div>';
+    if (list.length > 12) $('dueList').innerHTML += '<div class="hint">还有 ' + (list.length - 12) + ' 项未显示</div>';
   }
   function render() {
     renderStats(); renderCal(); renderTodos(); renderAnns(); renderCustom(); renderDue();
@@ -392,7 +433,6 @@
 
   $('prevM').onclick = function () { month--; if (month < 1) { month = 12; year--; } renderStats(); renderCal(); };
   $('nextM').onclick = function () { month++; if (month > 12) { month = 1; year++; } renderStats(); renderCal(); };
-  $('thisM').onclick = jumpToday;
   $('stats').onclick = function (e) {
     var card = e.target.closest && e.target.closest('[data-jump-today]');
     if (card && S) jumpToday();
@@ -438,6 +478,12 @@
   $('cellMenu').onclick = function (e) {
     var t = e.target, key = menuDate;
     if (t.dataset.mclose !== undefined) { closeMenu(); return; }
+    if (t.dataset.madd !== undefined) {
+      menuAdding = !menuAdding;
+      if (!menuAdding) menuType = null;
+      this.innerHTML = menuHtml();
+      return;
+    }
     var mt = t.dataset.mtype;
     if (mt) {
       menuType = menuType === mt ? null : mt;
@@ -455,9 +501,15 @@
       return;
     }
     var del = t.dataset.mtodoDel;
-    if (del) { saveTodos((S.workday.todos || []).filter(function (x) { return x.id !== del; })); return; }
+    if (del) {
+      if (!armDel('todo', del)) { this.innerHTML = menuHtml(); return; }
+      saveTodos((S.workday.todos || []).filter(function (x) { return x.id !== del; })); return;
+    }
     var adel = t.dataset.mannDel;
-    if (adel) { saveAnns((S.workday.anniversaries || []).filter(function (x) { return x.id !== adel; })); return; }
+    if (adel) {
+      if (!armDel('ann', adel)) { this.innerHTML = menuHtml(); return; }
+      saveAnns((S.workday.anniversaries || []).filter(function (x) { return x.id !== adel; })); return;
+    }
     var edit = t.dataset.mtodoEdit;
     if (edit) { inlineEdit(t.parentNode, edit, t.textContent, 'todo'); return; }
     var aedit = t.dataset.mannEdit;
@@ -481,6 +533,7 @@
       saveAnns(list);
     }
     inp.value = '';
+    $('cellMenu').innerHTML = menuHtml();
   };
   document.addEventListener('keydown', function (e) {
     if (e.key === 'Escape' && !$('cellMenu').hidden) closeMenu();
@@ -502,7 +555,10 @@
   $('todos').onclick = function (e) {
     if (e.target.dataset && e.target.dataset.donegroup !== undefined) { toggleFold('doneGroup'); renderTodos(); return; }
     var del = e.target.dataset.todoDel;
-    if (del) { saveTodos((S.workday.todos || []).filter(function (t) { return t.id !== del; })); return; }
+    if (del) {
+      if (!armDel('todo', del)) { renderTodos(); return; }
+      saveTodos((S.workday.todos || []).filter(function (t) { return t.id !== del; })); return;
+    }
     var chk = e.target.dataset.todoCheck;
     if (chk) {
       var next = (S.workday.todos || []).map(function (t) {
@@ -518,6 +574,11 @@
   $('annSave').onclick = function () {
     var name = $('annName').value.trim(), date = $('annDate').value.trim();
     if (!name || !date) { M.toast('名称和日期都要填', true); return; }
+    if (!/^\d{2}-\d{2}$/.test(date) && !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      M.toast('日期格式应为 05-20 或 2026-12-01', true); return;
+    }
+    var mo = Number(date.slice(-5, -3)), dd = Number(date.slice(-2));
+    if (mo < 1 || mo > 12 || dd < 1 || dd > 31) { M.toast('日期不合法', true); return; }
     var next = (S.workday.anniversaries || []).slice();
     next.push({ id: 'a' + Date.now().toString(36), name: name, date: date, repeat: $('annRepeat').value === '1' });
     $('annForm').hidden = true;
@@ -525,11 +586,13 @@
   };
   $('anns').onclick = function (e) {
     var id = e.target.dataset.annDel; if (!id) return;
+    if (!armDel('ann', id)) { renderAnns(); return; }
     write('set_anniversaries', {
       anniversaries: (S.workday.anniversaries || []).filter(function (a) { return a.id !== id; })
     });
   };
   function saveCustom() {
+    customDirty = false;
     var work = [], rest = [];
     $('customText').value.split('\n').forEach(function (line) {
       var dates = (line.match(/\d{4}-\d{2}-\d{2}/g) || []).join(',');
@@ -540,6 +603,7 @@
     write('set_custom', { work: work.join(','), rest: rest.join(',') });
   }
   $('customText').onchange = saveCustom;
+  $('customText').oninput = function () { customDirty = true; };
   $('calYear').onchange = function () { year = Number($('calYear').value) || year; renderStats(); renderCal(); };
   $('calMonth').onchange = function () { month = Number($('calMonth').value) || month; renderStats(); renderCal(); };
   Array.prototype.slice.call(document.querySelectorAll('[data-fold]')).forEach(function (head) {

@@ -167,6 +167,42 @@ def next_holiday(today: dt.date, holidays: dict) -> dict | None:
     return None
 
 
+def next_special_day(today, holidays, anniversaries):
+    candidates = []
+    off = holidays.get("off") or set()
+    names = holidays.get("names") or {}
+    for iso in off:
+        if iso >= today.isoformat():
+            try:
+                candidates.append((dt.date.fromisoformat(iso), str(names.get(iso) or "假期"), "节假日"))
+            except ValueError:
+                continue
+    for item in anniversaries or []:
+        name = str(item.get("name") or "")
+        raw = str(item.get("date") or "")
+        if item.get("repeat"):
+            md = raw[-5:]
+            for year in (today.year, today.year + 1):
+                try:
+                    day = dt.date.fromisoformat(f"{year:04d}-{md}")
+                except ValueError:
+                    continue
+                if day >= today:
+                    candidates.append((day, name, "纪念日"))
+                    break
+        else:
+            try:
+                day = dt.date.fromisoformat(raw)
+            except ValueError:
+                continue
+            if day >= today:
+                candidates.append((day, name, "纪念日"))
+    if not candidates:
+        return None
+    day, name, kind = min(candidates, key=lambda x: x[0])
+    return {"name": name, "date": day.isoformat(), "days": (day - today).days, "kind": kind}
+
+
 def _uid(prefix: str, *parts) -> str:
     raw = "|".join(str(p) for p in parts)
     return prefix + hashlib.md5(raw.encode("utf-8")).hexdigest()[:8]
