@@ -358,37 +358,31 @@
       $('cellMenu').innerHTML = menuHtml();
     };
   }
+  function todoWhen(t) {
+    var d = M.dayDiff(t.date, S.today);
+    return t.done ? '已完成' : d < 0 ? '逾期 ' + (-d) + ' 天'
+      : d === 0 ? '今天' : d === 1 ? '明天' : String(t.date).slice(5);
+  }
+  function todoRow(t) {
+    return '<div class="row' + (t.done ? ' done' : '') + '">' +
+      '<span class="sub todo-when">' + todoWhen(t) + '</span>' +
+      '<input type="checkbox" style="width:auto" data-todo-check="' + M.esc(t.id) + '"' + (t.done ? ' checked' : '') + '>' +
+      '<span class="txt todo-text" data-todo-edit="' + M.esc(t.id) + '" title="点击编辑">' + M.esc(t.text) + '</span>' +
+      '<button class="ghost danger" data-todo-del="' + M.esc(t.id) + '">' + delText('todo', t.id) + '</button></div>';
+  }
   function renderTodos() {
-    $('todoSummary').textContent = '未完成 ' + (S.workday.todos || []).filter(function (t) { return !t.done; }).length;
-    var list = (S.workday.todos || []).slice().sort(function (a, b) { return a.date.localeCompare(b.date); });
-    var groups = [['逾期', ''], ['今天', ''], ['未来 7 天', ''], ['以后', ''], ['已完成', '']];
-    var buckets = [[], [], [], [], []];
-    list.forEach(function (t) {
-      if (t.done) { buckets[4].push(t); return; }
-      var d = M.dayDiff(t.date, S.today);
-      if (d < 0) buckets[0].push(t);
-      else if (d === 0) buckets[1].push(t);
-      else if (d <= 7) buckets[2].push(t);
-      else buckets[3].push(t);
-    });
-    var html = '';
-    groups.forEach(function (g, i) {
-      if (!buckets[i].length) return;
-      if (i === 4) {
-        html += '<div class="group" data-donegroup>已完成 · ' + buckets[i].length + (fold.doneGroup ? ' ▴' : ' · 点展开 ▸') + '</div>';
-        if (!fold.doneGroup) return;
-      } else {
-        html += '<div class="group">' + g[0] + ' · ' + buckets[i].length + '</div>';
-      }
-      buckets[i].forEach(function (t) {
-        var d = M.dayDiff(t.date, S.today);
-        var sub = t.done ? '已完成' : d < 0 ? '逾期 ' + (-d) + ' 天' : d === 0 ? '今天' : d === 1 ? '明天' : t.date.slice(5);
-        html += '<div class="row' + (t.done ? ' done' : '') + '">' +
-          '<input type="checkbox" style="width:auto" data-todo-check="' + M.esc(t.id) + '"' + (t.done ? ' checked' : '') + '>' +
-          '<span class="txt">' + M.esc(t.text) + '</span><span class="sub">' + sub + '</span>' +
-          '<button class="ghost danger" data-todo-del="' + M.esc(t.id) + '">' + delText('todo', t.id) + '</button></div>';
-      });
-    });
+    var all = (S.workday.todos || []).slice();
+    $('todoSummary').textContent = '未完成 ' + all.filter(function (t) { return !t.done; }).length;
+    var open = all.filter(function (t) { return !t.done; })
+      .sort(function (a, b) { return String(a.date).localeCompare(String(b.date)); });
+    var done = all.filter(function (t) { return t.done; })
+      .sort(function (a, b) { return String(b.date).localeCompare(String(a.date)); });
+    var html = open.map(todoRow).join('');
+    if (done.length) {
+      html += '<div class="group" data-donegroup>已完成 · ' + done.length +
+        (fold.doneGroup ? ' ▴' : ' · 点展开 ▸') + '</div>';
+      if (fold.doneGroup) html += done.map(todoRow).join('');
+    }
     $('todos').innerHTML = html || '<div class="hint">还没有待办。</div>';
   }
   function saveTodos(next) { return write('set_todos', { todos: next }); }
@@ -552,21 +546,33 @@
     if (e.target.closest && (e.target.closest('#cellMenu') || e.target.closest('[data-iso]'))) return;
     closeMenu();
   });
-  function openTodo() {
+  var editingTodo = null;
+  function openTodo(id) {
+    editingTodo = id || null;
     $('todoMask').hidden = false;
-    $('todoDate').value = S.today; $('todoText').value = '';
+    $('todoTitle').textContent = id ? '编辑待办' : '新增待办';
+    var t = id ? (S.workday.todos || []).filter(function (x) { return x.id === id; })[0] : null;
+    $('todoDate').value = t ? t.date : S.today;
+    $('todoText').value = t ? t.text : '';
     $('todoText').focus();
   }
-  function closeTodo() { $('todoMask').hidden = true; }
+  function closeTodo() { $('todoMask').hidden = true; editingTodo = null; }
   function saveTodo() {
     var text = $('todoText').value.trim();
     if (!text) { M.toast('内容不能为空', true); return; }
+    var date = $('todoDate').value || S.today;
     var next = (S.workday.todos || []).slice();
-    next.push({ id: 't' + Date.now().toString(36), date: $('todoDate').value || S.today, text: text, done: false });
+    if (editingTodo) {
+      next = next.map(function (t) {
+        return t.id === editingTodo ? Object.assign({}, t, { text: text, date: date }) : t;
+      });
+    } else {
+      next.push({ id: 't' + Date.now().toString(36), date: date, text: text, done: false });
+    }
     closeTodo();
     saveTodos(next);
   }
-  $('todoAdd').onclick = function (e) { if (e && e.stopPropagation) e.stopPropagation(); openTodo(); };
+  $('todoAdd').onclick = function (e) { if (e && e.stopPropagation) e.stopPropagation(); openTodo(null); };
   $('todoSave').onclick = saveTodo;
   $('todoCancel').onclick = closeTodo;
   $('todoClose').onclick = closeTodo;
@@ -577,6 +583,8 @@
   };
   $('todos').onclick = function (e) {
     if (e.target.dataset && e.target.dataset.donegroup !== undefined) { toggleFold('doneGroup'); renderTodos(); return; }
+    var edit = e.target.dataset.todoEdit;
+    if (edit) { openTodo(edit); return; }
     var del = e.target.dataset.todoDel;
     if (del) {
       if (!armDel('todo', del)) { renderTodos(); return; }

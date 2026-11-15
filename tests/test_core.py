@@ -317,7 +317,7 @@ class TestRepo(unittest.TestCase):
 
     def test_workday_add_modals(self):
         html = (PKG / 'frontend' / 'workday.html').read_text(encoding='utf-8')
-        for token in ('id="todoMask"', 'id="annMask"', 'function openTodo()',
+        for token in ('id="todoMask"', 'id="annMask"', 'function openTodo(',
                       'function openAnn()', 'id="todoSave"', 'id="annSave"',
                       'closeTodo()', 'closeAnn()'):
             self.assertIn(token, html)
@@ -328,6 +328,16 @@ class TestRepo(unittest.TestCase):
         mnt = _load('maintenance')
         self.assertTrue(mnt.slugify('卡罗拉').startswith('p_'))
         self.assertEqual(mnt.slugify('Corolla'), 'corolla')
+
+    def test_todo_list_flat_sorted_and_click_to_edit(self):
+        html = (PKG / 'frontend' / 'workday.html').read_text(encoding='utf-8')
+        for token in ('function todoWhen(', 'function todoRow(', 'class="sub todo-when"',
+                      'data-todo-edit=', 'function openTodo(id)', 'editingTodo',
+                      'data-donegroup'):
+            self.assertIn(token, html)
+        self.assertNotIn("groups = [['逾期'", html)
+        self.assertNotIn("'未来 7 天'", html)
+        self.assertIn('.todo-when', (PKG / 'frontend' / 'shared.css').read_text(encoding='utf-8'))
 
     def test_frontend_routing_and_ws_snapshot(self):
         init = (PKG / '__init__.py').read_text(encoding='utf-8')
