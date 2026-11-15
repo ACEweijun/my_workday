@@ -1,5 +1,5 @@
 {
-  "name": "my_workday",
+  "name": "workday_maintenance",
   "render_readme": true,
   "homeassistant": "2025.1.0"
 }

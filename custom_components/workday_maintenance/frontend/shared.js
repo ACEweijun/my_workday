@@ -1,7 +1,7 @@
 window.MW = (function () {
   'use strict';
-  var DOMAIN = 'my_workday';
-  var EVENT = 'my_workday_updated';
+  var DOMAIN = 'workday_maintenance';
+  var EVENT = 'workday_maintenance_updated';
   var token = null, tokenExp = 0, listeners = [], sock = null, closed = false, ready = false, pending = {}, seq = 0;
 
   function $(id) { return document.getElementById(id); }
@@ -84,7 +84,7 @@ window.MW = (function () {
         if (ok && result && result.workday) resolve(result);
         else reject(new Error('WS 快照无数据'));
       };
-      try { sock.send(JSON.stringify({ type: 'my_workday/snapshot', id: id })); }
+      try { sock.send(JSON.stringify({ type: 'workday_maintenance/snapshot', id: id })); }
       catch (e) { delete pending[id]; clearTimeout(timer); reject(e); }
     });
   }

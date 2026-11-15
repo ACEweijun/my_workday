@@ -21,7 +21,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry,
 
 
 class MergedCalendar(CoordinatorEntity[MergedCoordinator], CalendarEntity):
-    _attr_name = "我的日程"
+    _attr_name = "workday_maintenance"
     _attr_has_entity_name = True
 
     def __init__(self, coordinator: MergedCoordinator, entry: ConfigEntry) -> None:
@@ -46,7 +46,7 @@ class MergedCalendar(CoordinatorEntity[MergedCoordinator], CalendarEntity):
                 title = f"上班 · {label}" if is_work else str(label)
                 events.append(CalendarEvent(
                     start=day, end=day + dt.timedelta(days=1),
-                    summary=title, description="my_workday 工作日安排"))
+                    summary=title, description="workday_maintenance 工作日安排"))
             day += dt.timedelta(days=1)
         for item in (data.get("maintenance") or {}).get("due_items") or []:
             try:
@@ -58,7 +58,7 @@ class MergedCalendar(CoordinatorEntity[MergedCoordinator], CalendarEntity):
                 events.append(CalendarEvent(
                     start=due, end=due + dt.timedelta(days=1),
                     summary=f"[维护·{marker}] {item.get('project')} · {item.get('name')}",
-                    description=f"my_workday 维护项目 {item.get('slug')}"))
+                    description=f"workday_maintenance 维护项目 {item.get('slug')}"))
         return events
 
     @property

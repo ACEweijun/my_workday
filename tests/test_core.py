@@ -11,17 +11,17 @@ import types
 import unittest
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
-PKG = ROOT / 'custom_components' / 'my_workday'
+PKG = ROOT / 'custom_components' / 'workday_maintenance'
 
-_pkg = types.ModuleType('my_workday')
+_pkg = types.ModuleType('workday_maintenance')
 _pkg.__path__ = [str(PKG)]
-sys.modules['my_workday'] = _pkg
+sys.modules['workday_maintenance'] = _pkg
 
 
 def _load(name):
-    spec = importlib.util.spec_from_file_location('my_workday.' + name, PKG / (name + '.py'))
+    spec = importlib.util.spec_from_file_location('workday_maintenance.' + name, PKG / (name + '.py'))
     module = importlib.util.module_from_spec(spec)
-    sys.modules['my_workday.' + name] = module
+    sys.modules['workday_maintenance.' + name] = module
     spec.loader.exec_module(module)
     return module
 
@@ -154,7 +154,7 @@ class TestRepo(unittest.TestCase):
         for key in ('domain', 'name', 'version', 'config_flow', 'documentation',
                     'issue_tracker', 'codeowners', 'requirements', 'dependencies'):
             self.assertIn(key, manifest)
-        self.assertEqual(manifest['domain'], 'my_workday')
+        self.assertEqual(manifest['domain'], 'workday_maintenance')
 
     def test_services_match_yaml(self):
         declared = set(re.findall(r'^SERVICE_[A-Z_]+\s*=\s*"([^"]+)"',
@@ -171,7 +171,7 @@ class TestRepo(unittest.TestCase):
             self.assertIn('M.onUpdate', html)
         shared = (PKG / 'frontend' / 'shared.js').read_text(encoding='utf-8')
         self.assertIn('subscribe_events', shared)
-        self.assertIn('my_workday_updated', shared)
+        self.assertIn('workday_maintenance_updated', shared)
 
     def test_no_inline_page_links(self):
         for page in ('workday.html', 'maintenance.html'):
@@ -594,9 +594,9 @@ class TestRepo(unittest.TestCase):
         init = (PKG / '__init__.py').read_text(encoding='utf-8')
         self.assertIn('FrontendFileView', init)
         self.assertNotIn('StaticPathConfig', init)
-        self.assertIn('my_workday/snapshot', init)
+        self.assertIn('workday_maintenance/snapshot', init)
         shared = (PKG / 'frontend' / 'shared.js').read_text(encoding='utf-8')
-        self.assertIn("type: 'my_workday/snapshot'", shared)
+        self.assertIn("type: 'workday_maintenance/snapshot'", shared)
         self.assertIn('snapshotViaWS', shared)
         manifest = json.loads((PKG / 'manifest.json').read_text(encoding='utf-8'))
         self.assertIn('websocket_api', manifest['dependencies'])

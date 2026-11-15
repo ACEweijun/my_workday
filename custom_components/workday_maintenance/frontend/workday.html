@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>我的工作日 · 我的日程</title>
+<title>我的工作日 · workday_maintenance</title>
 <link rel="stylesheet" href="shared.css">
 </head>
 <body>
@@ -112,7 +112,7 @@
   var addDate = null;
   var pendingDel = null, customDirty = false, dueTarget = null;
   var ANN_TYPES = { none: '不重复', week: '每周', month: '每月', quarter: '每季度', year: '每年' };
-  var FOLD_KEY = 'my_workday_fold2', fold = {};
+  var FOLD_KEY = 'workday_maintenance_fold2', fold = {};
   try { fold = JSON.parse(localStorage.getItem(FOLD_KEY) || '{}') || {}; } catch (e) { fold = {}; }
 
   function retryLoad() {

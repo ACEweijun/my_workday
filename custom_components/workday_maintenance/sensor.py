@@ -33,7 +33,7 @@ class Base(CoordinatorEntity[MergedCoordinator], SensorEntity):
         super().__init__(coordinator)
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, entry.entry_id)},
-            name="我的日程", manufacturer="自建", model="工作日 + 维护台账",
+            name="workday_maintenance", manufacturer="自建", model="工作日 + 维护台账",
         )
 
     @property

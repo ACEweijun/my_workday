@@ -1,4 +1,4 @@
-"""my_workday：工作日 / 待办 / 维护台账合并集成，两个独立网页共用一份数据。"""
+"""workday_maintenance：工作日 / 待办 / 维护台账合并集成，两个独立网页共用一份数据。"""
 from __future__ import annotations
 
 import datetime as dt
@@ -40,7 +40,7 @@ _FRONTEND_FILES = frozenset({"workday.html", "maintenance.html", "shared.js", "s
 
 class FrontendFileView(HomeAssistantView):
     url = PANEL_URL + "/{filename}"
-    name = "api:my_workday:frontend"
+    name = "api:workday_maintenance:frontend"
     requires_auth = False
 
     async def get(self, request, filename):
@@ -52,7 +52,7 @@ class FrontendFileView(HomeAssistantView):
         return web.FileResponse(path)
 
 
-@websocket_api.websocket_command({"type": "my_workday/snapshot"})
+@websocket_api.websocket_command({"type": "workday_maintenance/snapshot"})
 @websocket_api.async_response
 async def _ws_snapshot(hass: HomeAssistant, connection, msg) -> None:
     coordinator = _get(hass)
@@ -106,7 +106,7 @@ def _get(hass: HomeAssistant) -> MergedCoordinator:
     for value in bucket.values():
         if isinstance(value, MergedCoordinator):
             return value
-    raise HomeAssistantError("my_workday 尚未加载完成")
+    raise HomeAssistantError("workday_maintenance 尚未加载完成")
 
 
 async def _async_register_panels(hass: HomeAssistant) -> None:

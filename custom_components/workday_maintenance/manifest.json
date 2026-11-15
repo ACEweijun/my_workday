@@ -1,0 +1,18 @@
+{
+  "domain": "workday_maintenance",
+  "name": "workday_maintenance",
+  "codeowners": [
+    "@ACEweijun"
+  ],
+  "config_flow": true,
+  "dependencies": [
+    "http",
+    "websocket_api"
+  ],
+  "documentation": "https://github.com/ACEweijun/workday_maintenance",
+  "integration_type": "service",
+  "iot_class": "cloud_polling",
+  "issue_tracker": "https://github.com/ACEweijun/workday_maintenance/issues",
+  "requirements": [],
+  "version": "2.0.0"
+}

@@ -1,14 +1,14 @@
 {
-  "title": "我的日程",
+  "title": "My Schedule",
   "config": {
     "step": {
       "user": {
-        "title": "添加我的日程",
+        "title": "添加workday_maintenance",
         "description": "装好后侧边栏会出现「我的工作日」和「维护台账」两个页面。"
       }
     },
     "abort": {
-      "single_instance_allowed": "只能添加一个我的日程实例。"
+      "single_instance_allowed": "只能添加一个workday_maintenance实例。"
     }
   },
   "options": {
