@@ -188,7 +188,7 @@ textarea{font-size:var(--fs-sm)}
 .fold-head:hover h2{color:var(--accent)}
 .fold-arrow{color:var(--muted);font-size:13px;margin-left:4px}
 .items-head{cursor:pointer}
-.items-head .mini{font-size:12px;min-height:30px;padding:4px 8px}
+.items-head h2:hover{color:var(--accent)}
 .proj-head{flex-wrap:wrap;row-gap:8px}
 .menu .mrow{font-size:13px}
 @media (max-width:620px){
