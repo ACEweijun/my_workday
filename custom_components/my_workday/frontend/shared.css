@@ -328,3 +328,10 @@ input[type=checkbox]{width:22px;height:22px;min-height:22px;padding:0;margin:0;f
 .stat[data-jump-today] .lbl,.stat[data-jump-event] .lbl{color:var(--act)}
 .cell:hover{border-color:var(--act)}
 .fold:hover b{color:var(--act)}
+.items-head .spacer{min-height:26px;border:1px dashed var(--act);border-radius:7px;background:var(--accent-soft);position:relative;transition:background .15s}
+.items-head .spacer::after{content:"＋ 记录多项维护";position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;color:var(--act);white-space:nowrap}
+.items-head:hover .spacer{background:var(--act)}
+.items-head:hover .spacer::after{color:var(--surface)}
+.item-title::after{content:"＋ 记一次";margin-left:auto;flex:none;font-size:10px;font-weight:600;color:var(--act);border:1px dashed var(--act);border-radius:6px;padding:1px 6px;background:var(--accent-soft);white-space:nowrap}
+.item-title:hover::after{background:var(--act);color:var(--surface);border-style:solid}
+@media (max-width:520px){.items-head .spacer::after{content:"＋ 记维护"}.item-title::after{content:"＋ 记"}}
