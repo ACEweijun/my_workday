@@ -471,6 +471,33 @@ class TestRepo(unittest.TestCase):
         self.assertIn('.rec-check', css)
         self.assertIn('.modal-actions', css)
 
+    def test_single_item_record_hides_redundant_checkbox(self):
+        m = (PKG / 'frontend' / 'maintenance.html').read_text(encoding='utf-8')
+        # 聚焦单小项新记录：不再为那唯一的小项显示勾选框
+        self.assertIn('var singleNew = focusItem && !rec;', m)
+        self.assertIn("'<div class=\"rec-name\">' + M.esc(i.name) + '</div>'", m)
+        # 收集逻辑改为按行遍历，无勾选框即视为已勾选
+        self.assertIn("row.getAttribute('data-renoterow')", m)
+        self.assertIn('var checked = cb ? cb.checked : true;', m)
+        css = (PKG / 'frontend' / 'shared.css').read_text(encoding='utf-8')
+        self.assertIn('.rec-name', css)
+
+    def test_date_picker_no_self_showpicker(self):
+        for f in ('workday.html', 'maintenance.html'):
+            html = (PKG / 'frontend' / f).read_text(encoding='utf-8')
+            # 输入框自身 click 不再调 showPicker（改由原生处理），只保留整行点击
+            self.assertNotIn("el.addEventListener('click', open)", html)
+            self.assertIn('if (e.target === el) return;', html)
+            self.assertIn('if (typeof el.showPicker ===', html)
+
+    def test_workday_stat_labels_simplified(self):
+        w = (PKG / 'frontend' / 'workday.html').read_text(encoding='utf-8')
+        # 今天卡片：只显示「今天」，不再带日期与星期
+        self.assertIn("'<div class=\"lbl\">今天</div></div>'", w)
+        self.assertNotIn("'今天 · ' + S.today", w)
+        # 距离卡片：只显示名称，日期移到 title
+        self.assertIn("M.esc(ev.name) + '</div>'", w)
+
     def test_delete_labels_are_explicit(self):
         m = (PKG / 'frontend' / 'maintenance.html').read_text(encoding='utf-8')
         for token in ('删除这个项目', '删除这个小项', '删除这次记录'):

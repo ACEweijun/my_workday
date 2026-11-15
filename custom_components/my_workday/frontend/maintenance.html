@@ -245,15 +245,24 @@
         if (!list.some(function (i) { return i.id === id; })) list.push({ id: id, name: id });
       });
     }
+    var singleNew = focusItem && !rec;
     $('recEntries').innerHTML = list.map(function (i) {
       var has = Object.prototype.hasOwnProperty.call(inRec, i.id);
       var enabled = !rec || has;
       var checked = rec ? has : false;
+      var cb, name;
+      if (singleNew) {
+        cb = '';
+        name = '<div class="rec-name">' + M.esc(i.name) + '</div>';
+      } else {
+        cb = '<label class="rec-check"><input type="checkbox" data-recheck="' + M.esc(i.id) + '"' +
+          (checked ? ' checked' : '') + (enabled ? '' : ' disabled') + '><span>' + M.esc(i.name) + '</span></label>';
+        name = '';
+      }
       return '<div class="rec-ent' + (enabled ? '' : ' off') + '" data-renoterow="' + M.esc(i.id) + '">' +
-        '<label class="rec-check"><input type="checkbox" data-recheck="' + M.esc(i.id) + '"' +
-        (checked ? ' checked' : '') + (enabled ? '' : ' disabled') + '><span>' + M.esc(i.name) + '</span></label>' +
+        cb + name +
         '<input type="text" data-renote="' + M.esc(i.id) + '" value="' + M.esc(inRec[i.id] || '') +
-        '" placeholder="备注"' + (checked ? '' : ' disabled') + '>' +
+        '" placeholder="备注"' + (singleNew || checked ? '' : ' disabled') + '>' +
         (rec && !has ? '<span class="rec-off">本次未记录</span>' : '') + '</div>';
     }).join('') || '<div class="hint">还没有维护小项，请先新增。</div>';
   }
@@ -372,12 +381,13 @@
     var counter = raw === '' ? null : Number(raw);
     if (counter != null && !isFinite(counter)) { M.toast('计数值不合法', true); return null; }
     var ids = [], notes = {};
-    Array.prototype.slice.call(document.querySelectorAll('[data-recheck]')).forEach(function (cb) {
-      if (!cb.checked) return;
-      var id = cb.dataset.recheck;
+    Array.prototype.slice.call(document.querySelectorAll('[data-renoterow]')).forEach(function (row) {
+      var id = row.getAttribute('data-renoterow');
+      var cb = row.querySelector && row.querySelector('[data-recheck]');
+      var inp = row.querySelector && row.querySelector('[data-renote]');
+      var checked = cb ? cb.checked : true; // 无勾选框（聚焦单小项新记录）即视为已勾选
+      if (!checked) return;
       ids.push(id);
-      var row = cb.closest && cb.closest('[data-renoterow]');
-      var inp = row && row.querySelector && row.querySelector('[data-renote]');
       notes[id] = inp ? inp.value : '';
     });
     if (!ids.length && !$('recFocus').value) {
@@ -522,19 +532,19 @@
         var lab = row.querySelector && row.querySelector('label');
         if (lab && el.id && !lab.htmlFor) lab.htmlFor = el.id;
       }
-      function open() {
+      // 直接点输入框交给浏览器原生日历；只有点标签/整行空白处才用
+      // showPicker() 打开，避免输入框自身 click 里调用 showPicker 与原生
+      // 行为冲突导致日历打不开。
+      if (row) row.addEventListener('click', function (e) {
+        if (e.target === el) return;
+        if (el.disabled || el.readOnly) return;
         var now = Date.now();
         if (now - last < 250) return;
         last = now;
-        if (el.disabled || el.readOnly) return;
         try {
           if (typeof el.showPicker === 'function') el.showPicker();
           else el.focus();
         } catch (err) { el.focus(); }
-      }
-      el.addEventListener('click', open);
-      if (row) row.addEventListener('click', function (e) {
-        if (e.target !== el) open();
       });
     });
   }

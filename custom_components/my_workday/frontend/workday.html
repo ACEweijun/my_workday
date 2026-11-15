@@ -227,14 +227,14 @@
     var third = ev
       ? '<div class="num orange">' + (ev.days === 0 ? '今天' : ev.days + ' 天') + '</div>' +
         '<div class="lbl">距离</div>' +
-        '<div class="sub2" title="' + M.esc(ev.name + ' · ' + ev.date) + '">' + M.esc(ev.name + ' · ' + ev.date) + '</div>'
+        '<div class="sub2" title="' + M.esc(ev.name + ' · ' + ev.date) + '">' + M.esc(ev.name) + '</div>'
       : '<div class="num red">' + S.maintenance.due_total + ' 项</div><div class="lbl">维护已到期</div>';
     $('stats').innerHTML =
       '<div class="stat"><div class="num blue">' + ms.left + ' / ' + ms.total + '</div>' +
         '<div class="lbl">' + year + ' 年 ' + month + ' 月 · 剩余/总数</div></div>' +
       '<div class="stat" data-jump-today style="cursor:pointer" title="回到本月并定位到今天">' +
         '<div class="num">' + (w.today_work ? '上班' : '休息') + '</div>' +
-        '<div class="lbl">今天 · ' + S.today + ' · ' + M.esc(w.today_label || '') + '</div></div>' +
+        '<div class="lbl">今天</div></div>' +
       '<div class="stat"' + (ev ? ' data-jump-event style="cursor:pointer" title="跳到下一个节假日或纪念日"' : '') + '>' + third + '</div>';
   }
   function jumpToday() {
@@ -806,19 +806,19 @@
         var lab = row.querySelector && row.querySelector('label');
         if (lab && el.id && !lab.htmlFor) lab.htmlFor = el.id;
       }
-      function open() {
+      // 直接点输入框交给浏览器原生日历；只有点标签/整行空白处才用
+      // showPicker() 打开，避免输入框自身 click 里调用 showPicker 与原生
+      // 行为冲突导致日历打不开。
+      if (row) row.addEventListener('click', function (e) {
+        if (e.target === el) return;
+        if (el.disabled || el.readOnly) return;
         var now = Date.now();
         if (now - last < 250) return;
         last = now;
-        if (el.disabled || el.readOnly) return;
         try {
           if (typeof el.showPicker === 'function') el.showPicker();
           else el.focus();
         } catch (err) { el.focus(); }
-      }
-      el.addEventListener('click', open);
-      if (row) row.addEventListener('click', function (e) {
-        if (e.target !== el) open();
       });
     });
   }

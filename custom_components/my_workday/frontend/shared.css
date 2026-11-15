@@ -306,6 +306,7 @@ input[type=checkbox]{width:22px;height:22px;min-height:22px;padding:0;margin:0;f
 .rec-ent{display:grid;grid-template-columns:minmax(150px,1fr) minmax(120px,1fr);gap:8px 12px;align-items:center;padding:8px 0}
 .rec-check{width:auto;min-width:0;min-height:44px;gap:8px;font-size:13px;margin:0}
 .rec-check span{font-size:13px}
+.rec-name{font-size:13px;font-weight:600;color:var(--text);min-height:44px;display:flex;align-items:center}
 .rec-ent input[type=text]{width:100%;min-width:0;flex:none}
 .rec-off{grid-column:1 / -1}
 @media (max-width:620px){.rec-ent{grid-template-columns:1fr}.rec-check{min-height:40px}input[type=checkbox]{width:24px;height:24px;min-height:24px}}
