@@ -63,6 +63,7 @@
     <div class="modal-head"><b id="todoTitle">新增待办</b>
       <button class="ghost" id="todoClose" aria-label="关闭">×</button></div>
     <div class="modal-body">
+      <div class="add-types" id="todoTypes"><button class="on" data-addtype="todo">待办</button><button data-addtype="ann">纪念日</button></div>
       <div><label>日期</label><input type="date" id="todoDate"></div>
       <div><label>要做什么</label><input id="todoText" placeholder="回车保存"></div>
       <div class="full"><button class="primary" id="todoSave">保存</button>
@@ -75,6 +76,7 @@
     <div class="modal-head"><b id="annTitle">新增纪念日</b>
       <button class="ghost" id="annClose" aria-label="关闭">×</button></div>
     <div class="modal-body">
+      <div class="add-types" id="annTypes"><button data-addtype="todo">待办</button><button class="on" data-addtype="ann">纪念日</button></div>
       <div><label>名称</label><input id="annName" placeholder="生日"></div>
       <div><label>日期</label><input type="date" id="annDate"></div>
       <div><label>重复类型</label><select id="annRepeat">
@@ -106,7 +108,8 @@
 (function () {
   'use strict';
   var M = window.MW, $ = M.$, S = null, busy = false, year, month, retries = 0;
-  var menuDate = null, menuAdding = false, selectedCell = null, suppressClick = false, touchTimer = null, touchXY = null;
+  var menuDate = null, selectedCell = null, suppressClick = false, touchTimer = null, touchXY = null;
+  var addDate = null;
   var pendingDel = null, customDirty = false, dueTarget = null;
   var ANN_TYPES = { none: '不重复', week: '每周', month: '每月', quarter: '每季度', year: '每年' };
   var FOLD_KEY = 'my_workday_fold2', fold = {};
@@ -352,12 +355,7 @@
   function menuHtml() {
     if (!menuDate || !S) return '';
     var d = cellData(menuDate);
-    var h = '<div class="menu-add"><button class="primary" data-madd>' +
-      (menuAdding ? '收起新增' : '+ 新增') + '</button></div>';
-    if (menuAdding) {
-      h += '<div class="types"><button data-mtype="todo">新增待办</button>' +
-        '<button data-mtype="ann">新增纪念日</button></div>';
-    }
+    var h = '<div class="menu-add"><button class="primary" data-madd>+ 新增</button></div>';
     var rows = '';
     d.todos.forEach(function (t) {
       rows += '<div class="mrow"><input type="checkbox" class="menu-check" style="width:auto" data-mtodo-check="' +
@@ -396,13 +394,24 @@
   }
   function positionTip(x, y) {
     var el = $('cellTip');
+    el.style.left = '0px'; el.style.top = '0px';
+    var pad = 10;
     var w = el.offsetWidth || 240, h = el.offsetHeight || 80;
-    el.style.left = Math.max(8, Math.min((x || 0) + 14, window.innerWidth - w - 10)) + 'px';
-    el.style.top = Math.max(8, Math.min((y || 0) + 16, window.innerHeight - h - 10)) + 'px';
+    var vw = window.innerWidth || 1024, vh = window.innerHeight || 768;
+    var px = x == null ? 0 : x, py = y == null ? 0 : y;
+    var maxLeft = Math.max(pad, vw - w - pad), maxTop = Math.max(pad, vh - h - pad);
+    var left = px + 14;
+    if (left > maxLeft) left = px - w - 14;
+    left = Math.max(pad, Math.min(left, maxLeft));
+    var top = py + 16;
+    if (top > maxTop) top = py - h - 14;
+    top = Math.max(pad, Math.min(top, maxTop));
+    el.style.left = Math.round(left) + 'px';
+    el.style.top = Math.round(top) + 'px';
   }
   function openMenu(key, x, y) {
     if (!S) return;
-    menuDate = key; menuAdding = false;
+    menuDate = key;
     var el = $('cellMenu');
     el.hidden = false;
     el.innerHTML = menuHtml();
@@ -412,7 +421,7 @@
   }
   function closeMenu() {
     $('cellMenu').hidden = true;
-    menuDate = null; menuAdding = false;
+    menuDate = null;
   }
   function todoWhen(t) {
     var d = M.dayDiff(t.date, S.today);
@@ -501,6 +510,7 @@
   $('cal').addEventListener('mouseover', function (e) {
     var cell = e.target.closest && e.target.closest('[data-tip]');
     if (!cell) { hideTip(); return; }
+    if (e.relatedTarget && cell.contains(e.relatedTarget)) { positionTip(e.clientX, e.clientY); return; }
     showTip(cell, e.clientX, e.clientY);
   });
   $('cal').addEventListener('mousemove', function (e) {
@@ -508,7 +518,9 @@
   });
   $('cal').addEventListener('mouseout', function (e) {
     var cell = e.target.closest && e.target.closest('[data-tip]');
-    if (cell) hideTip();
+    if (!cell) return;
+    if (e.relatedTarget && cell.contains(e.relatedTarget)) return;
+    hideTip();
   });
   $('cal').onclick = function (e) {
     if (suppressClick) { suppressClick = false; return; }
@@ -552,16 +564,9 @@
     if (e && e.stopPropagation) e.stopPropagation();
     var t = e.target;
     if (t.dataset.madd !== undefined) {
-      menuAdding = !menuAdding;
-      this.innerHTML = menuHtml();
-      return;
-    }
-    var mt = t.dataset.mtype;
-    if (mt) {
       var date = menuDate;
       closeMenu();
-      if (mt === 'todo') openTodo(null, date);
-      else openAnn(null, date);
+      openAddForm(date, 'todo');
       return;
     }
     var del = t.dataset.mtodoDel;
@@ -651,6 +656,7 @@
   function openTodo(id, date) {
     editingTodo = id || null;
     $('todoMask').hidden = false;
+    $('todoTypes').hidden = !!id;
     $('todoTitle').textContent = id ? '编辑待办' : '新增待办';
     var t = id ? (S.workday.todos || []).filter(function (x) { return x.id === id; })[0] : null;
     $('todoDate').value = t ? t.date : (date || S.today);
@@ -673,7 +679,32 @@
     closeTodo();
     saveTodos(next);
   }
-  $('todoAdd').onclick = function (e) { if (e && e.stopPropagation) e.stopPropagation(); openTodo(null); };
+  function openAddForm(date, type) {
+    addDate = date || S.today;
+    if (type === 'ann') openAnn(null, addDate); else openTodo(null, addDate);
+  }
+  function switchAddType(type, date) {
+    addDate = date || addDate || S.today;
+    if (type === 'ann') {
+      if (!$('todoMask').hidden) closeTodo();
+      openAnn(null, addDate);
+    } else {
+      if (!$('annMask').hidden) closeAnn();
+      openTodo(null, addDate);
+    }
+  }
+  function bindAddTypes(id, dateId) {
+    $(id).onclick = function (e) {
+      var btn = e.target.closest && e.target.closest('[data-addtype]');
+      if (!btn) return;
+      var on = $(id).querySelector('.on');
+      if (on && on.dataset.addtype === btn.dataset.addtype) return;
+      switchAddType(btn.dataset.addtype, $(dateId).value || addDate);
+    };
+  }
+  bindAddTypes('todoTypes', 'todoDate');
+  bindAddTypes('annTypes', 'annDate');
+  $('todoAdd').onclick = function (e) { if (e && e.stopPropagation) e.stopPropagation(); openAddForm(S.today, 'todo'); };
   $('todoSave').onclick = saveTodo;
   $('todoCancel').onclick = closeTodo;
   $('todoClose').onclick = closeTodo;
@@ -702,6 +733,7 @@
   function openAnn(id, date) {
     editingAnn = id || null;
     $('annMask').hidden = false;
+    $('annTypes').hidden = !!id;
     $('annTitle').textContent = id ? '编辑纪念日' : '新增纪念日';
     var a = id ? (S.workday.anniversaries || []).filter(function (x) { return x.id === id; })[0] : null;
     $('annName').value = a ? a.name : '';
@@ -727,7 +759,7 @@
     closeAnn();
     write('set_anniversaries', { anniversaries: next });
   }
-  $('annAdd').onclick = function (e) { if (e && e.stopPropagation) e.stopPropagation(); openAnn(null); };
+  $('annAdd').onclick = function (e) { if (e && e.stopPropagation) e.stopPropagation(); openAddForm(S.today, 'ann'); };
   $('annCancel').onclick = closeAnn;
   $('annClose').onclick = closeAnn;
   $('annMask').onclick = function (e) { if (e.target === this) closeAnn(); };

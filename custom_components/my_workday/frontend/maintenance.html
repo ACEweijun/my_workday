@@ -181,9 +181,25 @@
     if (!p) { $('items').innerHTML = '<div class="hint">先新建一个项目。</div>'; return; }
     $('items').innerHTML = (p.items || []).map(function (i) {
       var st = stateOf(i.id);
-      var left = st.remaining_days == null ? '—' : (st.remaining_days <= 0 ? '已到期' : '还剩 ' + st.remaining_days + ' 天');
       var recs = itemRecords(p, i.id);
       var open = !!itemOpen[i.id];
+      var last = recs[0] || null, lastNote = '';
+      if (last) {
+        var lastEntry = (last.entries || []).filter(function (x) { return x.item_id === i.id; })[0];
+        lastNote = lastEntry && lastEntry.note ? lastEntry.note : '';
+      }
+      var meta;
+      if (!last) {
+        meta = '<div class="item-meta-static">暂无维护记录</div>';
+      } else {
+        var bits = ['最新维护：' + M.esc(last.date)];
+        if (last.counter != null && last.counter !== '') {
+          bits.push(M.esc(last.counter) + (p.need_counter ? ' ' + M.esc(p.counter_unit || '') : ''));
+        }
+        if (lastNote) bits.push(M.esc(lastNote));
+        meta = '<button class="ghost item-meta-toggle" data-rectoggle="' + M.esc(i.id) +
+          '" title="点击展开维护记录">' + bits.join(' · ') + ' ' + (open ? '▴' : '▸') + '</button>';
+      }
       var recHtml = recs.length ? recs.slice(0, 5).map(function (r) {
         var e = (r.entries || []).filter(function (x) { return x.item_id === i.id; })[0] || {};
         return '<div class="row rec-row" data-rec="' + M.esc(r.id) + '" data-recitem="' + M.esc(i.id) +
@@ -195,10 +211,7 @@
         '<b>' + M.esc(i.name) + '</b>' +
         (i.note ? '<span class="item-note">' + M.esc(i.note) + '</span>' : '') +
         pill(st.status) + '</div>' +
-        '<button class="ghost item-meta-toggle" data-rectoggle="' + M.esc(i.id) + '">上次维护：' +
-        M.esc(i.last_date || '未设') + ' · ' + left +
-        (p.need_counter && st.remaining_counter != null ? ' · 还剩 ' + st.remaining_counter + ' ' + M.esc(p.counter_unit || '') : '') +
-        ' ' + (open ? '▴' : '▸') + '</button>' +
+        meta +
         (open && recHtml ? '<div class="sub-list item-records">' + recHtml + '</div>' : '') +
         '</div>';
     }).join('') || '<div class="hint">还没有维护小项。</div>';

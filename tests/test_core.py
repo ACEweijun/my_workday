@@ -284,11 +284,16 @@ class TestRepo(unittest.TestCase):
         w = (PKG / 'frontend' / 'workday.html').read_text(encoding='utf-8')
         self.assertIn('workday.next_event', w)
 
-    def test_menu_two_stage_and_order(self):
+    def test_menu_add_opens_modal_directly(self):
         w = (PKG / 'frontend' / 'workday.html').read_text(encoding='utf-8')
-        for token in ('data-madd', 'menuAdding', 'menu-existing', 'menu-add'):
+        for token in ('data-madd', 'openAddForm(', 'switchAddType(', 'bindAddTypes(',
+                      'data-addtype', 'id="todoTypes"', 'id="annTypes"',
+                      'menu-existing', 'menu-add'):
             self.assertIn(token, w)
-        self.assertLess(w.index("'+ 新增'"), w.index('menu-existing'))
+        self.assertNotIn('menuAdding', w)
+        self.assertNotIn('data-mtype', w)
+        self.assertNotIn('收起新增', w)
+        self.assertLess(w.index('+ 新增</button>'), w.index('menu-existing'))
         self.assertNotIn('这天还没有安排', w)
         self.assertNotIn('id="thisM"', w)
         self.assertNotIn('<header class="bar">', w)
@@ -510,7 +515,7 @@ class TestRepo(unittest.TestCase):
         m = (PKG / 'frontend' / 'maintenance.html').read_text(encoding='utf-8')
         for token in ('function itemRecords(', 'data-recitem=', 'item-records',
                       'data-rectoggle=', 'itemOpen', 'class="item-note"',
-                      'item-meta-toggle', '上次维护：',
+                      'item-meta-toggle', '最新维护：', '暂无维护记录',
                       'openRecForm(recordId, focusItem)', 'id="recFocus"',
                       '编辑这条维护记录', '移除这条记录', 'renderRecEntries(p, rec, focusItem)',
                       'if (!focus || e.item_id === focus)'):
@@ -541,6 +546,36 @@ class TestRepo(unittest.TestCase):
         self.assertIn('snapshotViaWS', shared)
         manifest = json.loads((PKG / 'manifest.json').read_text(encoding='utf-8'))
         self.assertIn('websocket_api', manifest['dependencies'])
+
+    def test_add_modal_type_switch(self):
+        w = (PKG / 'frontend' / 'workday.html').read_text(encoding='utf-8')
+        for token in ('openAddForm(date,', "openAddForm(S.today, 'todo')",
+                      "openAddForm(S.today, 'ann')", '$(\'todoTypes\').hidden = !!id',
+                      '$(\'annTypes\').hidden = !!id', "if (type === 'ann')"):
+            self.assertIn(token, w)
+        css = (PKG / 'frontend' / 'shared.css').read_text(encoding='utf-8')
+        self.assertIn('.add-types{', css)
+        self.assertIn('.add-types button.on{', css)
+
+    def test_tooltip_flips_near_viewport_edge(self):
+        w = (PKG / 'frontend' / 'workday.html').read_text(encoding='utf-8')
+        for token in ("el.style.left = '0px'", 'if (left > maxLeft) left = px - w - 14;',
+                      'if (top > maxTop) top = py - h - 14;', 'e.relatedTarget && cell.contains'):
+            self.assertIn(token, w)
+        css = (PKG / 'frontend' / 'shared.css').read_text(encoding='utf-8')
+        for token in ('width:max-content', 'max-height:min(60vh,420px)',
+                      'box-sizing:border-box', 'overflow:hidden'):
+            self.assertIn(token, css)
+
+    def test_item_meta_shows_latest_record(self):
+        m = (PKG / 'frontend' / 'maintenance.html').read_text(encoding='utf-8')
+        for token in ('var last = recs[0] || null', "'最新维护：' + M.esc(last.date)",
+                      '暂无维护记录', 'item-meta-static', 'lastEntry'):
+            self.assertIn(token, m)
+        self.assertNotIn('上次维护：', m)
+        self.assertNotIn('var left = st.remaining_days', m)
+        css = (PKG / 'frontend' / 'shared.css').read_text(encoding='utf-8')
+        self.assertIn('.item-meta-static{', css)
 
 
 if __name__ == '__main__':
