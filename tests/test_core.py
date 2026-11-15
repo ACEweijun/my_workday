@@ -356,8 +356,8 @@ class TestRepo(unittest.TestCase):
             self.assertNotIn(gone, w)
         m = (PKG / 'frontend' / 'maintenance.html').read_text(encoding='utf-8')
         self.assertIn('id="projDelete"', m)
-        self.assertIn('导出当前项目 JSON', m)
-        for gone in ('id="projEdit"', 'data-pm="edit"', 'data-pm="log"', '导出 JSON 备份'):
+        for gone in ('id="projEdit"', 'data-pm="edit"', 'data-pm="log"', '导出 JSON 备份',
+                     '导出当前项目 JSON', '导出 Markdown', 'projExportJson', 'projExportMd'):
             self.assertNotIn(gone, m)
 
     def test_backend_anniversary_repeat_types(self):
@@ -394,16 +394,18 @@ class TestRepo(unittest.TestCase):
 
     def test_project_name_click_edits_and_modal_has_delete(self):
         m = (PKG / 'frontend' / 'maintenance.html').read_text(encoding='utf-8')
-        for token in ('class="proj-title"', "$('projectHead').onclick",
+        for token in ("if (target === slug) { openForm(true); return; }",
                       'openForm(true)', 'id="projDelete"', 'function deleteProject()',
-                      'id="projExtra"', 'id="projExportJson"', 'id="projExportMd"'):
+                      'id="projExtra"', 'function renderCounter()'):
             self.assertIn(token, m)
-        self.assertNotIn('id="projMenu"', m)
-        self.assertNotIn('contextmenu', m)
+        for gone in ('id="projMenu"', 'contextmenu', 'id="projectHead"',
+                     'id="projectType"', 'id="overview"', 'data-del=',
+                     'id="projExportJson"', 'id="projExportMd"'):
+            self.assertNotIn(gone, m)
 
     def test_history_rows_open_record_modal(self):
         m = (PKG / 'frontend' / 'maintenance.html').read_text(encoding='utf-8')
-        for token in ("$('history').onclick", 'data-rec=', 'function openRecForm(recordId)',
+        for token in ("$('history').onclick", 'data-rec=', 'function openRecForm(recordId, focusItem)',
                       'id="recEntries"', 'data-renote=', 'data-recheck=',
                       'function saveRecForm()', 'rec-row', '一次维护一行',
                       'function deleteRec()', 'renderRecEntries('):
@@ -444,7 +446,7 @@ class TestRepo(unittest.TestCase):
 
     def test_unified_record_modal_modes(self):
         m = (PKG / 'frontend' / 'maintenance.html').read_text(encoding='utf-8')
-        for token in ("recTitle').textContent = rec ? '编辑维护记录' : '记录多项维护'",
+        for token in ("recTitle').textContent = !rec ? '记录多项维护' : (focusItem ? '编辑这条维护记录' : '编辑维护记录')",
                       "M.call('log_service', data)", 'function collectRecForm()',
                       'function deleteRec()', '本次未记录', '取消勾选即从这次记录中移除'):
             self.assertIn(token, m)
@@ -461,11 +463,58 @@ class TestRepo(unittest.TestCase):
 
     def test_menu_todo_checkbox_and_delete(self):
         w = (PKG / 'frontend' / 'workday.html').read_text(encoding='utf-8')
+        self.assertIn("if (e && e.stopPropagation) e.stopPropagation();", w)
         for token in ('data-mtodo-check=', 'data-mtodo-del=', 'data-mann-del=',
                       "$('cellMenu').onchange", 'menu-check', 'saveTodos('):
             self.assertIn(token, w)
         self.assertIn('.menu .mrow input[type=checkbox]',
                       (PKG / 'frontend' / 'shared.css').read_text(encoding='utf-8'))
+
+    def test_due_items_open_record_modal(self):
+        w = (PKG / 'frontend' / 'workday.html').read_text(encoding='utf-8')
+        for token in ('id="dueMask"', 'id="dueInfo"', 'function openDueForm(pslug, itemId)',
+                      'function saveDue()', 'data-mdueslug=', 'data-dueitem=',
+                      "write('log_service', data)", "dueList').onclick",
+                      'due-click', 'due-row'):
+            self.assertIn(token, w)
+        css = (PKG / 'frontend' / 'shared.css').read_text(encoding='utf-8')
+        self.assertIn('.due-info', css)
+        self.assertIn('.due-row:hover', css)
+
+    def test_item_delete_moved_into_edit_modal(self):
+        m = (PKG / 'frontend' / 'maintenance.html').read_text(encoding='utf-8')
+        for token in ('id="itemDelete" hidden', 'function deleteItem()',
+                      "$('itemDelete').hidden = !id", '确认删除这个小项'):
+            self.assertIn(token, m)
+        self.assertNotIn("data-del=", m)
+
+    def test_project_card_header_stripped(self):
+        m = (PKG / 'frontend' / 'maintenance.html').read_text(encoding='utf-8')
+        for gone in ('id="projectHead"', 'id="projectType"', 'id="overview"',
+                     'renderOverview(', '已到期</div>', '快到了</div>'):
+            self.assertNotIn(gone, m)
+        self.assertIn('function renderCounter()', m)
+
+    def test_two_action_buttons_side_by_side(self):
+        m = (PKG / 'frontend' / 'maintenance.html').read_text(encoding='utf-8')
+        head = m[m.index('class="card-head proj-head'):m.index('</div>', m.index('class="card-head proj-head'))]
+        self.assertIn('id="logOpen"', head)
+        self.assertIn('id="itemAdd"', head)
+        self.assertEqual(m.count('id="itemAdd"'), 1)
+        self.assertIn('action-row', m)
+        self.assertIn('.action-row button{flex:1',
+                      (PKG / 'frontend' / 'shared.css').read_text(encoding='utf-8'))
+        self.assertNotIn('<h2>维护小项</h2><span class="spacer"></span>\n        <button', m)
+
+    def test_item_own_records_clickable(self):
+        m = (PKG / 'frontend' / 'maintenance.html').read_text(encoding='utf-8')
+        for token in ('function itemRecords(', 'data-recitem=', 'item-records',
+                      'openRecForm(recordId, focusItem)', 'id="recFocus"',
+                      '编辑这条维护记录', '移除这条记录', 'renderRecEntries(p, rec, focusItem)',
+                      'if (!focus || e.item_id === focus)'):
+            self.assertIn(token, m)
+        css = (PKG / 'frontend' / 'shared.css').read_text(encoding='utf-8')
+        self.assertIn('.item-records{', css)
 
     def test_frontend_routing_and_ws_snapshot(self):
         init = (PKG / '__init__.py').read_text(encoding='utf-8')

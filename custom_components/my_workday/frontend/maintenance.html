@@ -13,10 +13,9 @@
   <aside class="mt-side" id="projSide"></aside>
   <div class="mt-main">
     <section class="card">
-      <div class="card-head proj-head"><h2 id="projectHead" class="proj-title" title="点击编辑项目">维护项目</h2><span class="spacer"></span>
-        <span class="hint" id="projectType"></span>
-        <button class="primary" id="logOpen">记录多项维护</button></div>
-      <div class="stats" id="overview"></div>
+      <div class="card-head proj-head action-row">
+        <button class="primary" id="logOpen">记录多项维护</button>
+        <button class="primary" id="itemAdd">+ 新增小项</button></div>
       <div class="form" id="counterBox" hidden>
         <div><label id="counterLabel">当前计数</label><input type="number" id="counterValue"></div>
       </div>
@@ -24,8 +23,7 @@
     </section>
 
     <section class="card">
-      <div class="card-head"><h2>维护小项</h2><span class="spacer"></span>
-        <button class="primary" id="itemAdd">+ 新增小项</button></div>
+      <div class="card-head"><h2>维护小项</h2></div>
       <div id="items"></div>
     </section>
 
@@ -49,8 +47,6 @@
       <div class="full"><button class="primary" id="projSave">创建</button>
         <button class="ghost" id="projCancel">取消</button></div>
       <div class="full modal-extra" id="projExtra" hidden>
-        <button class="ghost" id="projExportJson">导出当前项目 JSON</button>
-        <button class="ghost" id="projExportMd">导出 Markdown</button>
         <button class="ghost danger" id="projDelete">删除这个项目</button>
       </div>
     </div>
@@ -67,7 +63,8 @@
       <div><label>间隔天数</label><input type="number" id="itemDays" value="180"></div>
       <div id="itemIntervalBox" hidden><label>间隔计数（可留空）</label><input type="number" id="itemInterval" placeholder="10000"></div>
       <div><label>备注</label><input id="itemNote"></div>
-      <div class="full"><button class="primary" id="itemSave">保存</button>
+      <div class="full modal-actions"><button class="primary" id="itemSave">保存</button>
+        <button class="ghost danger" id="itemDelete" hidden>删除这个小项</button>
         <button class="ghost" id="itemCancel">取消</button></div>
     </div>
   </div>
@@ -78,7 +75,7 @@
     <div class="modal-head"><b id="recTitle">记录多项维护</b>
       <button class="ghost" id="recClose" aria-label="关闭">×</button></div>
     <div class="modal-body">
-      <input type="hidden" id="recId">
+      <input type="hidden" id="recId"><input type="hidden" id="recFocus">
       <div><label>维护日期</label><input type="date" id="recDate"></div>
       <div id="recCounterBox" hidden><label id="recCounterLabel">当前计数</label><input type="number" id="recCounter"></div>
       <div class="hint" id="recHint"></div>
@@ -104,7 +101,6 @@
     if (pendingDel !== k) { pendingDel = k; return false; }
     pendingDel = null; return true;
   }
-  function delText(k, normal, armed) { return pendingDel === k ? armed : normal; }
   function retryLoad() { if (retries >= 3) return; retries++; setTimeout(load, 2000); }
   function load() {
     if (busy || !M.isHA()) return Promise.resolve();
@@ -144,19 +140,13 @@
     var labels = { due: '已到期', soon: '快到了', ok: '正常', unset: '未设基准' };
     return '<span class="pill ' + st + '">' + (labels[st] || st) + '</span>';
   }
-  function download(name, text, type) {
-    var a = document.createElement('a');
-    a.href = URL.createObjectURL(new Blob([text], { type: type || 'text/plain;charset=utf-8' }));
-    a.download = name; a.click();
-    setTimeout(function () { URL.revokeObjectURL(a.href); }, 2000);
-  }
   function hideModals() { MASKS.forEach(function (id) { $(id).hidden = true; }); }
   function resetForms() {
     hideModals();
-    $('itemId').value = ''; $('recId').value = '';
+    $('itemId').value = ''; $('recId').value = ''; $('recFocus').value = '';
     editingSlug = null; pendingDel = null;
   }
-  function render() { renderSide(); renderOverview(); renderItems(); renderHistory(); }
+  function render() { renderSide(); renderCounter(); renderItems(); renderHistory(); }
   function renderSide() {
     var list = S.maintenance.projects || [];
     $('projHint').hidden = list.length > 0;
@@ -168,21 +158,9 @@
         M.esc(p.name) + (s.due_count ? '<span class="badge">' + s.due_count + '</span>' : '') + '</button>';
     }).join('') + '<button class="tab add primary" id="projAdd">+ 新建</button>';
   }
-  function renderOverview() {
-    var p = project(), s = summary();
-    if (!p || !s) {
-      $('projectHead').textContent = '维护项目';
-      $('projectType').textContent = '';
-      $('overview').innerHTML = '<div class="stat"><div class="num">—</div><div class="lbl">尚无项目</div></div>';
-      $('counterBox').hidden = true;
-      return;
-    }
-    $('projectHead').textContent = p.name;
-    var labels = { vehicle: '车辆', appliance: '家电', furniture: '家具', area: '区域', custom: '自己建' };
-    $('projectType').textContent = labels[p.type] || '';
-    $('overview').innerHTML =
-      '<div class="stat"><div class="num red">' + s.due_count + '</div><div class="lbl">已到期</div></div>' +
-      '<div class="stat"><div class="num orange">' + s.soon_count + '</div><div class="lbl">快到了</div></div>';
+  function renderCounter() {
+    var p = project();
+    if (!p) { $('counterBox').hidden = true; return; }
     $('counterBox').hidden = !p.need_counter;
     if (p.need_counter) {
       $('counterLabel').textContent = '更新当前' + (p.counter_label || '计数') + '（' + (p.counter_unit || '') + '）';
@@ -193,20 +171,33 @@
       }
     }
   }
+  function itemRecords(p, itemId) {
+    return (p.history || []).filter(function (r) {
+      return (r.entries || []).some(function (e) { return e.item_id === itemId; });
+    }).sort(function (a, b) { return b.date.localeCompare(a.date); });
+  }
   function renderItems() {
     var p = project();
     if (!p) { $('items').innerHTML = '<div class="hint">先新建一个项目。</div>'; return; }
     $('items').innerHTML = (p.items || []).map(function (i) {
       var st = stateOf(i.id);
       var left = st.remaining_days == null ? '—' : (st.remaining_days <= 0 ? '已到期' : '还剩 ' + st.remaining_days + ' 天');
+      var recs = itemRecords(p, i.id);
+      var recHtml = recs.length ? recs.slice(0, 5).map(function (r) {
+        var e = (r.entries || []).filter(function (x) { return x.item_id === i.id; })[0] || {};
+        return '<div class="row rec-row" data-rec="' + M.esc(r.id) + '" data-recitem="' + M.esc(i.id) +
+          '" title="点击编辑这条记录"><span class="sub">' + M.esc(r.date) +
+          (r.counter != null ? ' · ' + M.esc(r.counter) : '') + '</span><span class="txt">' +
+          M.esc(e.note || '') + '</span></div>';
+      }).join('') + (recs.length > 5 ? '<div class="hint">还有 ' + (recs.length - 5) + ' 条</div>' : '') : '';
       return '<div class="mt-item"><div class="top item-title" data-item="' + M.esc(i.id) + '" title="点击编辑">' +
         '<b>' + M.esc(i.name) + '</b>' + pill(st.status) + '</div>' +
         '<div class="meta">上次维护：' + M.esc(i.last_date || '未设') + ' · ' + left +
         (p.need_counter && st.remaining_counter != null ? ' · 还剩 ' + st.remaining_counter + ' ' + M.esc(p.counter_unit || '') : '') +
         '</div>' +
         (i.note ? '<div class="meta">' + M.esc(i.note) + '</div>' : '') +
-        '<div class="acts"><button class="danger" data-del="' + M.esc(i.id) + '">' +
-        delText('item:' + i.id, '删除这个小项', '确认删除这个小项') + '</button></div></div>';
+        (recHtml ? '<div class="sub-list item-records">' + recHtml + '</div>' : '') +
+        '</div>';
     }).join('') || '<div class="hint">还没有维护小项。</div>';
   }
   function renderHistory() {
@@ -226,13 +217,17 @@
     }).join('') : '<div class="hint">还没有维护记录。</div>';
     if (rows.length > 30) $('history').innerHTML += '<div class="hint">还有 ' + (rows.length - 30) + ' 次未显示</div>';
   }
-  function renderRecEntries(p, rec) {
+  function renderRecEntries(p, rec, focusItem) {
     var inRec = {};
     ((rec && rec.entries) || []).forEach(function (e) { inRec[e.item_id] = e.note || ''; });
-    var list = (p.items || []).slice();
-    Object.keys(inRec).forEach(function (id) {
-      if (!list.some(function (i) { return i.id === id; })) list.push({ id: id, name: id });
-    });
+    var list = focusItem
+      ? (p.items || []).filter(function (i) { return i.id === focusItem; })
+      : (p.items || []).slice();
+    if (!focusItem) {
+      Object.keys(inRec).forEach(function (id) {
+        if (!list.some(function (i) { return i.id === id; })) list.push({ id: id, name: id });
+      });
+    }
     $('recEntries').innerHTML = list.map(function (i) {
       var has = Object.prototype.hasOwnProperty.call(inRec, i.id);
       var enabled = !rec || has;
@@ -293,16 +288,6 @@
       write('add_project', data);
     }
   }
-  function exportProject(kind) {
-    var p = project(); if (!p) return;
-    if (kind === 'json') {
-      download(p.slug + '.json', JSON.stringify(p, null, 2), 'application/json');
-    } else {
-      M.call('export_markdown', { slug: p.slug }, true).then(function (r) {
-        download(p.slug + '.md', (r && r.markdown) || '', 'text/markdown;charset=utf-8');
-      }).catch(function (err) { M.toast(err.message, true); });
-    }
-  }
   function deleteProject() {
     if (!editingSlug) return;
     if (!armDel('project')) { $('projDelete').textContent = '确认删除这个项目'; return; }
@@ -323,9 +308,18 @@
     $('itemIntervalBox').hidden = !p.need_counter;
     $('itemInterval').value = p.need_counter && i && i.interval_counter != null ? i.interval_counter : '';
     $('itemNote').value = i ? (i.note || '') : '';
+    $('itemDelete').hidden = !id;
+    $('itemDelete').textContent = '删除这个小项';
     $('itemName').focus();
   }
-  function openRecForm(recordId) {
+  function deleteItem() {
+    var id = $('itemId').value;
+    if (!id) return;
+    if (!armDel('item:' + id)) { $('itemDelete').textContent = '确认删除这个小项'; return; }
+    hideModals();
+    write('delete_item', { slug: slug, item_id: id });
+  }
+  function openRecForm(recordId, focusItem) {
     var p = project();
     if (!p) { M.toast('先新建一个项目', true); return; }
     var rec = recordId ? recordById(recordId) : null;
@@ -333,10 +327,12 @@
     resetForms();
     $('recMask').hidden = false;
     $('recId').value = recordId || '';
-    $('recTitle').textContent = rec ? '编辑维护记录' : '记录多项维护';
-    $('recHint').textContent = rec
-      ? '取消勾选即从这次记录中移除该小项；要补记其它小项请用「记录多项维护」。'
-      : '勾哪行就记哪行，每行可写自己的备注；填了计数会同步更新当前计数。';
+    $('recFocus').value = focusItem || '';
+    $('recTitle').textContent = !rec ? '记录多项维护' : (focusItem ? '编辑这条维护记录' : '编辑维护记录');
+    $('recHint').textContent = !rec
+      ? '勾哪行就记哪行，每行可写自己的备注；填了计数会同步更新当前计数。'
+      : (focusItem ? '只编辑这个小项在这次维护里的记录；取消勾选即移除这条记录。'
+                   : '取消勾选即从这次记录中移除该小项；要补记其它小项请用「记录多项维护」。');
     $('recDate').value = rec ? (rec.date || S.today) : S.today;
     $('recCounterBox').hidden = !p.need_counter;
     $('recCounterLabel').textContent = '当前' + (p.counter_label || '计数');
@@ -344,9 +340,9 @@
       ? (rec.counter == null ? '' : rec.counter)
       : (p.counter == null ? '' : p.counter);
     $('recDelete').hidden = !rec;
-    $('recDelete').textContent = '删除这次记录';
+    $('recDelete').textContent = focusItem ? '移除这条记录' : '删除这次记录';
     $('recSave').textContent = rec ? '保存修改' : '保存这次维护';
-    renderRecEntries(p, rec);
+    renderRecEntries(p, rec, focusItem);
     $('recDate').focus();
   }
   function collectRecForm() {
@@ -364,7 +360,7 @@
       var inp = row && row.querySelector && row.querySelector('[data-renote]');
       notes[id] = inp ? inp.value : '';
     });
-    if (!ids.length) {
+    if (!ids.length && !$('recFocus').value) {
       M.toast($('recId').value ? '至少保留一个小项，或用「删除这次记录」' : '至少勾选一个小项', true);
       return null;
     }
@@ -381,8 +377,9 @@
       done = M.call('log_service', data).then(load);
     } else {
       var rec = recordById(recId) || { entries: [] };
+      var focus = $('recFocus').value;
       var original = {};
-      (rec.entries || []).forEach(function (e) { original[e.item_id] = true; });
+      (rec.entries || []).forEach(function (e) { if (!focus || e.item_id === focus) original[e.item_id] = true; });
       var ops = [];
       Object.keys(original).forEach(function (id) {
         if (form.ids.indexOf(id) < 0) {
@@ -407,9 +404,11 @@
   }
   function deleteRec() {
     var recId = $('recId').value; if (!recId) return;
-    if (!armDel('record')) { $('recDelete').textContent = '确认删除这次记录'; return; }
+    if (!armDel('record')) { $('recDelete').textContent = $('recFocus').value ? '确认移除这条记录' : '确认删除这次记录'; return; }
     var rec = recordById(recId); if (!rec) return;
-    var ops = (rec.entries || []).map(function (e) {
+    var focus = $('recFocus').value;
+    var entries = focus ? (rec.entries || []).filter(function (e) { return e.item_id === focus; }) : (rec.entries || []);
+    var ops = entries.map(function (e) {
       return function () {
         return M.call('delete_record', { slug: slug, record_id: recId, item_id: e.item_id });
       };
@@ -428,16 +427,10 @@
     if (target === slug) { openForm(true); return; }
     slug = target; lastCount = null; resetForms(); render();
   };
-  $('projectHead').onclick = function () {
-    if (!project()) { M.toast('先新建一个项目', true); return; }
-    openForm(true);
-  };
   $('projCounter').onchange = syncUnit;
   $('projSave').onclick = submitProject;
   $('projCancel').onclick = resetForms;
   $('projClose').onclick = resetForms;
-  $('projExportJson').onclick = function () { exportProject('json'); };
-  $('projExportMd').onclick = function () { exportProject('md'); };
   $('projDelete').onclick = deleteProject;
   $('counterValue').onchange = function () {
     var p = project(); if (!p) return;
@@ -449,6 +442,7 @@
   $('itemAdd').onclick = function () { openItemForm(null); };
   $('itemCancel').onclick = function () { $('itemMask').hidden = true; };
   $('itemClose').onclick = function () { $('itemMask').hidden = true; };
+  $('itemDelete').onclick = deleteItem;
   $('itemSave').onclick = function () {
     var id = $('itemId').value;
     var data = { slug: slug, name: $('itemName').value.trim(),
@@ -463,13 +457,10 @@
   $('items').onclick = function (e) {
     var p = project(); if (!p) return;
     var t = e.target;
+    var own = t.closest && t.closest('[data-recitem]');
+    if (own) { openRecForm(own.dataset.rec, own.dataset.recitem); return; }
     var title = t.closest && t.closest('[data-item]');
     if (title) { openItemForm(title.dataset.item); return; }
-    var del = t.dataset.del;
-    if (del) {
-      if (!armDel('item:' + del)) { renderItems(); return; }
-      write('delete_item', { slug: slug, item_id: del });
-    }
   };
   $('history').onclick = function (e) {
     var row = e.target.closest && e.target.closest('[data-rec]');

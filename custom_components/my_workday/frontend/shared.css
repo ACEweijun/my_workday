@@ -251,3 +251,20 @@ textarea{font-size:var(--fs-sm)}
 .menu .mrow input[type=checkbox]{flex:none;width:15px;height:15px;margin:0;accent-color:var(--accent)}
 .menu .mrow .mt{flex:1}
 .menu .mrow button{flex:none;padding:2px 6px;min-height:26px;font-size:11px}
+
+.due-click{cursor:pointer}
+.due-click:hover{color:var(--accent);text-decoration:underline}
+.due-row{cursor:pointer;transition:background .15s;border-radius:6px}
+.due-row:hover{background:var(--soft)}
+.due-info{background:var(--soft);border-radius:8px;padding:10px 12px;margin-bottom:12px}
+.due-info b{font-size:14px;font-weight:600}
+.due-info .hint{margin-top:4px}
+
+.item-records{margin-top:8px;border-top:.5px solid var(--line);padding-top:4px}
+.item-records .row{padding:5px 0;font-size:11px}
+.item-records .row .sub{font-size:11px}
+
+.action-row{display:flex;gap:8px}
+.action-row button{flex:1;width:auto;min-height:44px;text-align:center}
+.action-row .spacer{display:none}
+@media (max-width:620px){.action-row{gap:6px}.action-row button{min-height:42px;font-size:12px}}

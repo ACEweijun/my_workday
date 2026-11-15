@@ -85,13 +85,28 @@
     </div>
   </div>
 </div>
+
+<div class="modal-mask" id="dueMask" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="dueTitle">
+    <div class="modal-head"><b id="dueTitle">记录一次维护</b>
+      <button class="ghost" id="dueClose" aria-label="关闭">×</button></div>
+    <div class="modal-body">
+      <div class="due-info" id="dueInfo"></div>
+      <div><label>维护日期</label><input type="date" id="dueDate"></div>
+      <div id="dueCounterBox" hidden><label id="dueCounterLabel">当前计数</label><input type="number" id="dueCounter"></div>
+      <div><label>备注（可留空）</label><input id="dueNote"></div>
+      <div class="full"><button class="primary" id="dueSave">确定并记录这次维护</button>
+        <button class="ghost" id="dueCancel">取消</button></div>
+    </div>
+  </div>
+</div>
 <script src="shared.js"></script>
 <script>
 (function () {
   'use strict';
   var M = window.MW, $ = M.$, S = null, busy = false, year, month, retries = 0;
   var menuDate = null, menuAdding = false, selectedCell = null, suppressClick = false, touchTimer = null, touchXY = null;
-  var pendingDel = null, customDirty = false;
+  var pendingDel = null, customDirty = false, dueTarget = null;
   var ANN_TYPES = { none: '不重复', week: '每周', month: '每月', quarter: '每季度', year: '每年' };
   var FOLD_KEY = 'my_workday_fold2', fold = {};
   try { fold = JSON.parse(localStorage.getItem(FOLD_KEY) || '{}') || {}; } catch (e) { fold = {}; }
@@ -356,7 +371,9 @@
         '<button class="danger" data-mann-del="' + M.esc(a.id) + '">' + delText('ann', a.id) + '</button></div>';
     });
     d.dues.forEach(function (x) {
-      rows += '<div class="mrow"><span class="mkind due">维</span><span class="mt">' +
+      rows += '<div class="mrow"><span class="mkind due">维</span>' +
+        '<span class="mt due-click" data-mdueslug="' + M.esc(x.slug) + '" data-mdueitem="' +
+        M.esc(x.item_id) + '" title="点击记录这次维护">' +
         M.esc(x.project + ' · ' + x.name) + '</span></div>';
     });
     if (rows) h += '<div class="menu-existing">' + rows + '</div>';
@@ -422,7 +439,9 @@
     var list = S.maintenance.due_items || [];
     $('dueSummary').textContent = list.length + ' 项';
     $('dueList').innerHTML = list.length ? list.slice(0, 12).map(function (d) {
-      return '<div class="row"><span class="pill ' + (d.status === 'due' ? 'due' : 'soon') + '">' +
+      return '<div class="row due-row" data-dueslug="' + M.esc(d.slug) + '" data-dueitem="' +
+        M.esc(d.item_id) + '" title="点击记录这次维护">' +
+        '<span class="pill ' + (d.status === 'due' ? 'due' : 'soon') + '">' +
         (d.status === 'due' ? '已到期' : '快到了') + '</span>' +
         '<span class="txt">' + M.esc(d.project) + ' · ' + M.esc(d.name) + '</span>' +
         '<span class="sub">' + M.esc(d.due_date) + '</span></div>';
@@ -497,6 +516,7 @@
     if (touchTimer) { clearTimeout(touchTimer); touchTimer = null; }
   });
   $('cellMenu').onclick = function (e) {
+    if (e && e.stopPropagation) e.stopPropagation();
     var t = e.target;
     if (t.dataset.madd !== undefined) {
       menuAdding = !menuAdding;
@@ -522,6 +542,8 @@
       write('set_anniversaries', { anniversaries: (S.workday.anniversaries || []).filter(function (x) { return x.id !== adel; }) });
       return;
     }
+    var dslug = t.dataset.mdueslug;
+    if (dslug) { closeMenu(); openDueForm(dslug, t.dataset.mdueitem); return; }
     var tid = t.dataset.mtodoOpen;
     if (tid) { closeMenu(); openTodo(tid); return; }
     var aid = t.dataset.mannOpen;
@@ -535,16 +557,63 @@
       return t.id === id ? Object.assign({}, t, { done: done }) : t;
     }));
   };
+  $('dueList').onclick = function (e) {
+    var row = e.target.closest && e.target.closest('[data-dueitem]');
+    if (row) openDueForm(row.dataset.dueslug, row.dataset.dueitem);
+  };
+  $('dueCancel').onclick = closeDue;
+  $('dueClose').onclick = closeDue;
+  $('dueSave').onclick = saveDue;
+  $('dueMask').onclick = function (e) { if (e.target === this) closeDue(); };
   document.addEventListener('keydown', function (e) {
     if (e.key === 'Escape' && !$('cellMenu').hidden) closeMenu();
     if (e.key === 'Escape' && !$('todoMask').hidden) closeTodo();
     if (e.key === 'Escape' && !$('annMask').hidden) closeAnn();
+    if (e.key === 'Escape' && !$('dueMask').hidden) closeDue();
   });
   document.addEventListener('click', function (e) {
     if ($('cellMenu').hidden) return;
     if (e.target.closest && (e.target.closest('#cellMenu') || e.target.closest('[data-iso]'))) return;
     closeMenu();
   });
+  function openDueForm(pslug, itemId) {
+    var p = (S.maintenance.projects || []).filter(function (x) { return x.slug === pslug; })[0];
+    var item = p && (p.items || []).filter(function (x) { return x.id === itemId; })[0];
+    if (!p || !item) { M.toast('找不到这个维护小项', true); return; }
+    var sm = (S.maintenance.summaries || []).filter(function (x) { return x.slug === pslug; })[0] || { items: [] };
+    var st = (sm.items || []).filter(function (x) { return x.id === itemId; })[0] || {};
+    dueTarget = { slug: pslug, item_id: itemId };
+    $('dueMask').hidden = false;
+    var status = st.status === 'due' ? '已到期' : st.status === 'soon' ? '快到了' : '正常';
+    var left = st.remaining_days == null ? '' :
+      (st.remaining_days < 0 ? '逾期 ' + (-st.remaining_days) + ' 天' : '还剩 ' + st.remaining_days + ' 天');
+    $('dueInfo').innerHTML = '<b>' + M.esc(p.name + ' · ' + item.name) + '</b>' +
+      '<div class="hint">' + status + (left ? ' · ' + left : '') + '</div>' +
+      '<div class="hint">上次维护：' + M.esc(item.last_date || '未设') +
+      (p.need_counter ? ' · 当前' + M.esc(p.counter_label || '计数') + '：' +
+        M.esc(p.counter == null ? '—' : p.counter) + ' ' + M.esc(p.counter_unit || '') : '') + '</div>' +
+      (item.note ? '<div class="hint">小项备注：' + M.esc(item.note) + '</div>' : '');
+    $('dueDate').value = S.today;
+    $('dueCounterBox').hidden = !p.need_counter;
+    $('dueCounterLabel').textContent = '当前' + (p.counter_label || '计数') + '（' + (p.counter_unit || '') + '）';
+    $('dueCounter').value = p.counter == null ? '' : p.counter;
+    $('dueNote').value = '';
+    $('dueDate').focus();
+  }
+  function closeDue() { $('dueMask').hidden = true; dueTarget = null; }
+  function saveDue() {
+    if (!dueTarget) return;
+    var date = $('dueDate').value;
+    if (!date) { M.toast('维护日期要填', true); return; }
+    var raw = $('dueCounterBox').hidden ? '' : String($('dueCounter').value == null ? '' : $('dueCounter').value).trim();
+    if (raw !== '' && !isFinite(Number(raw))) { M.toast('计数值不合法', true); return; }
+    var notes = {}; notes[dueTarget.item_id] = $('dueNote').value;
+    var data = { slug: dueTarget.slug, item_ids: [dueTarget.item_id], date: date, item_notes: notes };
+    if (raw !== '') data.counter = Number(raw);
+    closeDue();
+    var btn = $('dueSave'); btn.disabled = true;
+    write('log_service', data).finally(function () { btn.disabled = false; });
+  }
   var editingTodo = null, editingAnn = null;
   function openTodo(id, date) {
     editingTodo = id || null;
