@@ -221,11 +221,12 @@ class TestRepo(unittest.TestCase):
         html = (PKG / 'frontend' / 'maintenance.html').read_text(encoding='utf-8')
         for token in ('id="projMask"', 'id="itemMask"', 'id="logMask"', 'id="recMask"',
                       'id="unitBox"', 'syncUnit', 'autoSlug', 'data-item=',
-                      '记录多项维护', 'data-pm=', 'logtable', 'mt-side',
-                      'contextmenu', 'counterValue', 'data-lognote'):
+                      '记录多项维护', 'logtable', 'mt-side',
+                      'counterValue', 'data-lognote'):
             self.assertIn(token, html)
         for gone in ('projStep1', 'projStep2', 'projNext', 'projUnitLabel',
-                     'data-baseline=', 'data-logone=', 'data-edit=', 'set_baseline'):
+                     'data-baseline=', 'data-logone=', 'data-edit=', 'set_baseline',
+                     'id="projMenu"', 'data-pm=', 'renderMenu('):
             self.assertNotIn(gone, html)
 
     def test_layout_css_fixes(self):
@@ -264,9 +265,10 @@ class TestRepo(unittest.TestCase):
 
     def test_delete_project_confirmation_works(self):
         html = (PKG / 'frontend' / 'maintenance.html').read_text(encoding='utf-8')
-        self.assertIn('var armed = deleteArmed;', html)
-        self.assertIn('if (!armed)', html)
-        self.assertNotIn("write('delete_project', { slug: target }).then(function ()", html)
+        self.assertIn("armDel('project')", html)
+        self.assertIn("$('projDelete').textContent = '确认删除'", html)
+        self.assertIn("write('delete_project', { slug: target })", html)
+        self.assertNotIn('var armed = deleteArmed;', html)
 
     def test_backend_next_special_day(self):
         h = {'off': {'2027-01-01'}, 'names': {'2027-01-01': '元旦'}, 'makeup': set()}
@@ -302,7 +304,7 @@ class TestRepo(unittest.TestCase):
         w = (PKG / 'frontend' / 'workday.html').read_text(encoding='utf-8')
         m = (PKG / 'frontend' / 'maintenance.html').read_text(encoding='utf-8')
         for token in ('fingerprint(', '数据已被其他页面修改', 'armDel(', 'customDirty',
-                      '请用日期控件选择日期', '无放假数据'):
+                      '请用日期控件选择日期'):
             self.assertIn(token, w)
         for token in ('请填写有效的计数值', '间隔天数要填', '维护日期要填',
                       'btn.disabled = true', '确认删除'):
@@ -343,16 +345,16 @@ class TestRepo(unittest.TestCase):
         w = (PKG / 'frontend' / 'workday.html').read_text(encoding='utf-8')
         for token in ('data-mtodo-open=', 'data-mann-open=', 'data-ann-edit=',
                       'function openAnn(id, date)', 'function openTodo(id, date)',
-                      'menu-x', 'function saveAnn()'):
+                      'function saveAnn()'):
             self.assertIn(token, w)
-        for gone in ('menuInput', 'data-mtodo-done=', 'data-mtodo-del=',
+        for gone in ('menuInput', 'menu-x', 'data-mclose', 'data-mtodo-done=', 'data-mtodo-del=',
                      'data-mann-del=', 'data-mtodo-edit=', 'data-mann-edit=',
                      'inlineEdit(', 'saveAnns('):
             self.assertNotIn(gone, w)
         m = (PKG / 'frontend' / 'maintenance.html').read_text(encoding='utf-8')
-        self.assertIn('id="projEdit"', m)
+        self.assertIn('id="projDelete"', m)
         self.assertIn('导出当前项目 JSON', m)
-        for gone in ('data-pm="edit"', 'data-pm="log"', '导出 JSON 备份'):
+        for gone in ('id="projEdit"', 'data-pm="edit"', 'data-pm="log"', '导出 JSON 备份'):
             self.assertNotIn(gone, m)
 
     def test_backend_anniversary_repeat_types(self):
@@ -386,6 +388,54 @@ class TestRepo(unittest.TestCase):
             self.assertIn(token, html)
         self.assertIn('.stat[data-jump-event]:hover',
                       (PKG / 'frontend' / 'shared.css').read_text(encoding='utf-8'))
+
+    def test_project_name_click_edits_and_modal_has_delete(self):
+        m = (PKG / 'frontend' / 'maintenance.html').read_text(encoding='utf-8')
+        for token in ('class="proj-title"', "$('projectHead').onclick",
+                      'openForm(true)', 'id="projDelete"', 'function deleteProject()',
+                      'id="projExtra"', 'id="projExportJson"', 'id="projExportMd"'):
+            self.assertIn(token, m)
+        self.assertNotIn('id="projMenu"', m)
+        self.assertNotIn('contextmenu', m)
+
+    def test_history_rows_open_record_modal(self):
+        m = (PKG / 'frontend' / 'maintenance.html').read_text(encoding='utf-8')
+        for token in ("$('history').onclick", 'data-rec=', 'function openRecForm(recordId)',
+                      'id="recEntries"', 'data-renote=', 'data-renotedel=',
+                      'function saveRecForm()', 'rec-row', '点任意一行可编辑'):
+            self.assertIn(token, m)
+        for gone in ('data-redit=', 'data-rdel=', 'id="recItem"', 'id="recNote"', '整次维护的流水，只读'):
+            self.assertNotIn(gone, m)
+        css = (PKG / 'frontend' / 'shared.css').read_text(encoding='utf-8')
+        self.assertIn('.proj-title:hover', css)
+        self.assertIn('.rec-row:hover', css)
+        self.assertIn('.rec-ent', css)
+
+    def test_removed_hints_and_menu_close_button(self):
+        w = (PKG / 'frontend' / 'workday.html').read_text(encoding='utf-8')
+        for gone in ('sourceLabel', '放假数据：', 'holiday-cn 自动获取',
+                     'menu-x', 'data-mclose'):
+            self.assertNotIn(gone, w)
+        m = (PKG / 'frontend' / 'maintenance.html').read_text(encoding='utf-8')
+        self.assertNotIn('离开输入框自动保存', m)
+        self.assertIn('document.addEventListener(\'click\'', w)
+
+    def test_project_tabs_horizontal_top(self):
+        m = (PKG / 'frontend' / 'maintenance.html').read_text(encoding='utf-8')
+        self.assertLess(m.index('class="mt-side"'), m.index('class="mt-main"'))
+        self.assertIn('data-tab=', m)
+        css = (PKG / 'frontend' / 'shared.css').read_text(encoding='utf-8')
+        for token in ('.mt-layout{flex-direction:column}',
+                      '.mt-side{width:100%;flex:none;flex-direction:row',
+                      '.mt-side .tab.on{',
+                      '.mt-side .tab{min-width:84px}'):
+            self.assertIn(token, css)
+
+    def test_interval_counter_hidden_without_project_counter(self):
+        m = (PKG / 'frontend' / 'maintenance.html').read_text(encoding='utf-8')
+        self.assertIn('id="itemIntervalBox" hidden', m)
+        self.assertIn("$('itemIntervalBox').hidden = !p.need_counter", m)
+        self.assertIn("p.need_counter && i && i.interval_counter != null", m)
 
     def test_frontend_routing_and_ws_snapshot(self):
         init = (PKG / '__init__.py').read_text(encoding='utf-8')

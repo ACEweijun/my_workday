@@ -23,7 +23,6 @@
     </div>
     <div class="cal-head" id="calHead"></div>
     <div class="cal" id="cal"><div class="hint" style="padding:20px">正在加载日历…</div></div>
-    <div class="hint" id="sourceLabel" style="margin-top:8px"></div>
   </section>
 
   <section class="card fold-card">
@@ -218,11 +217,6 @@
         '<div class="num">' + (w.today_work ? '上班' : '休息') + '</div>' +
         '<div class="lbl">今天 · ' + S.today + ' · ' + M.esc(w.today_label || '') + '</div></div>' +
       '<div class="stat"' + (ev ? ' data-jump-event style="cursor:pointer" title="跳到下一个节假日或纪念日"' : '') + '>' + third + '</div>';
-    var h = S.holidays || {}, hasYear = (h.off || []).concat(h.makeup || [])
-      .some(function (d) { return Number(String(d).slice(0, 4)) === year; });
-    $('sourceLabel').textContent = '放假数据：' +
-      ({ network: 'holiday-cn 自动获取', manual: '手工覆盖', fallback: '未获取到，按周末规则降级' }[w.holiday_source] || '未获取到') +
-      (hasYear ? '' : ' · ' + year + ' 年无放假数据，按周末规则');
   }
   function jumpToday() {
     var t = M.dateOf(S.today);
@@ -341,8 +335,7 @@
   function menuHtml() {
     if (!menuDate || !S) return '';
     var d = cellData(menuDate);
-    var h = '<button class="ghost menu-x" data-mclose aria-label="关闭">×</button>' +
-      '<div class="menu-add"><button class="primary" data-madd>' +
+    var h = '<div class="menu-add"><button class="primary" data-madd>' +
       (menuAdding ? '收起新增' : '+ 新增') + '</button></div>';
     if (menuAdding) {
       h += '<div class="types"><button data-mtype="todo">新增待办</button>' +
@@ -501,7 +494,6 @@
   });
   $('cellMenu').onclick = function (e) {
     var t = e.target;
-    if (t.dataset.mclose !== undefined) { closeMenu(); return; }
     if (t.dataset.madd !== undefined) {
       menuAdding = !menuAdding;
       this.innerHTML = menuHtml();
