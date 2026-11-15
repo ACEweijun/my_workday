@@ -237,7 +237,7 @@ class TestRepo(unittest.TestCase):
     def test_stats_follow_month_and_jump_today(self):
         html = (PKG / 'frontend' / 'workday.html').read_text(encoding='utf-8')
         for token in ('function monthStats()', 'function jumpToday()',
-                      'data-jump-today', '月工作日 · 剩余/总数',
+                      'data-jump-today', '月 · 剩余/总数',
                       'renderStats(); renderCal();'):
             self.assertIn(token, html)
         self.assertNotIn('dateLabel', html)
@@ -302,7 +302,7 @@ class TestRepo(unittest.TestCase):
         w = (PKG / 'frontend' / 'workday.html').read_text(encoding='utf-8')
         m = (PKG / 'frontend' / 'maintenance.html').read_text(encoding='utf-8')
         for token in ('fingerprint(', '数据已被其他页面修改', 'armDel(', 'customDirty',
-                      '日期格式应为', '无放假数据'):
+                      '请用日期控件选择日期', '无放假数据'):
             self.assertIn(token, w)
         for token in ('请填写有效的计数值', '间隔天数要填', '维护日期要填',
                       'btn.disabled = true', '确认删除'):
@@ -354,6 +354,38 @@ class TestRepo(unittest.TestCase):
         self.assertIn('导出当前项目 JSON', m)
         for gone in ('data-pm="edit"', 'data-pm="log"', '导出 JSON 备份'):
             self.assertNotIn(gone, m)
+
+    def test_backend_anniversary_repeat_types(self):
+        today = dt.date(2026, 11, 15)
+        cases = [
+            ({'name': '周会', 'date': '2026-11-02', 'repeat': 'week'}, dt.date(2026, 11, 16)),
+            ({'name': '月结', 'date': '2026-10-05', 'repeat': 'month'}, dt.date(2026, 12, 5)),
+            ({'name': '季检', 'date': '2026-08-15', 'repeat': 'quarter'}, dt.date(2026, 11, 15)),
+            ({'name': '结婚', 'date': '2026-11-16', 'repeat': 'year'}, dt.date(2026, 11, 16)),
+            ({'name': '交付', 'date': '2027-03-18', 'repeat': 'none'}, dt.date(2027, 3, 18)),
+            ({'name': '旧格式', 'date': '11-16', 'repeat': True}, dt.date(2026, 11, 16)),
+        ]
+        for item, expect in cases:
+            self.assertEqual(wd.anniversary_next(item, today), expect, item['name'])
+
+    def test_anniversary_form_controls(self):
+        html = (PKG / 'frontend' / 'workday.html').read_text(encoding='utf-8')
+        for token in ('type="date" id="annDate"', '重复类型',
+                      '<option value="week">每周</option>',
+                      '<option value="month">每月</option>',
+                      '<option value="quarter">每季度</option>',
+                      '<option value="year">每年</option>',
+                      'ANN_TYPES', 'function annNext(', 'function annOn('):
+            self.assertIn(token, html)
+        self.assertNotIn('每年重复', html)
+        self.assertNotIn("value=\"1\">是</option>", html)
+
+    def test_third_stat_jumps_to_next_event(self):
+        html = (PKG / 'frontend' / 'workday.html').read_text(encoding='utf-8')
+        for token in ('data-jump-event', 'function jumpToEvent()', 'selectedCell = ev.date'):
+            self.assertIn(token, html)
+        self.assertIn('.stat[data-jump-event]:hover',
+                      (PKG / 'frontend' / 'shared.css').read_text(encoding='utf-8'))
 
     def test_frontend_routing_and_ws_snapshot(self):
         init = (PKG / '__init__.py').read_text(encoding='utf-8')

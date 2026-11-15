@@ -1,6 +1,7 @@
 """工作日、调休、待办、纪念日的纯逻辑，不依赖 Home Assistant。"""
 from __future__ import annotations
 
+import calendar
 import datetime as dt
 import hashlib
 import re
@@ -167,6 +168,58 @@ def next_holiday(today: dt.date, holidays: dict) -> dict | None:
     return None
 
 
+def normalize_anniversary(item, today: dt.date):
+    raw_date = str(item.get("date") or "")
+    rep = item.get("repeat")
+    if rep is True:
+        rep = "year"
+    elif rep is False or rep is None:
+        rep = "year" if len(raw_date) == 5 else "none"
+    if rep not in ("none", "week", "month", "quarter", "year"):
+        rep = "none"
+    if len(raw_date) == 5:
+        raw_date = f"{today.year:04d}-{raw_date}"
+    try:
+        start = dt.date.fromisoformat(raw_date[:10])
+    except ValueError:
+        return None
+    return {"name": str(item.get("name") or ""), "start": start, "repeat": rep}
+
+
+def _add_months(day: dt.date, months: int) -> dt.date:
+    year = day.year + (day.month - 1 + months) // 12
+    month = (day.month - 1 + months) % 12 + 1
+    return dt.date(year, month, min(day.day, calendar.monthrange(year, month)[1]))
+
+
+def anniversary_next(item, today: dt.date):
+    norm = normalize_anniversary(item, today)
+    if not norm:
+        return None
+    start, rep = norm["start"], norm["repeat"]
+    if rep == "none":
+        return start if start >= today else None
+    if rep == "week":
+        if start >= today:
+            return start
+        return start + dt.timedelta(weeks=(today - start).days // 7 + 1)
+    if rep == "year":
+        for year in (today.year, today.year + 1):
+            try:
+                day = dt.date(year, start.month, start.day)
+            except ValueError:
+                continue
+            if day >= today:
+                return day
+        return None
+    step = 3 if rep == "quarter" else 1
+    for n in range(240):
+        day = _add_months(start, n * step)
+        if day >= today:
+            return day
+    return None
+
+
 def next_special_day(today, holidays, anniversaries):
     candidates = []
     off = holidays.get("off") or set()
@@ -178,25 +231,10 @@ def next_special_day(today, holidays, anniversaries):
             except ValueError:
                 continue
     for item in anniversaries or []:
-        name = str(item.get("name") or "")
-        raw = str(item.get("date") or "")
-        if item.get("repeat"):
-            md = raw[-5:]
-            for year in (today.year, today.year + 1):
-                try:
-                    day = dt.date.fromisoformat(f"{year:04d}-{md}")
-                except ValueError:
-                    continue
-                if day >= today:
-                    candidates.append((day, name, "纪念日"))
-                    break
-        else:
-            try:
-                day = dt.date.fromisoformat(raw)
-            except ValueError:
-                continue
-            if day >= today:
-                candidates.append((day, name, "纪念日"))
+        norm = normalize_anniversary(item, today)
+        day = anniversary_next(item, today)
+        if day and norm:
+            candidates.append((day, norm["name"], "纪念日"))
     if not candidates:
         return None
     day, name, kind = min(candidates, key=lambda x: x[0])

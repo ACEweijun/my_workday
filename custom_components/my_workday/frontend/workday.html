@@ -76,8 +76,11 @@
       <button class="ghost" id="annClose" aria-label="关闭">×</button></div>
     <div class="modal-body">
       <div><label>名称</label><input id="annName" placeholder="生日"></div>
-      <div><label>日期</label><input id="annDate" placeholder="05-20 或 2026-12-01"></div>
-      <div><label>每年重复</label><select id="annRepeat"><option value="1">是</option><option value="0">否</option></select></div>
+      <div><label>日期</label><input type="date" id="annDate"></div>
+      <div><label>重复类型</label><select id="annRepeat">
+        <option value="none">不重复</option><option value="week">每周</option>
+        <option value="month">每月</option><option value="quarter">每季度</option>
+        <option value="year">每年</option></select></div>
       <div class="full"><button class="primary" id="annSave">保存</button>
         <button class="ghost" id="annCancel">取消</button></div>
     </div>
@@ -90,6 +93,7 @@
   var M = window.MW, $ = M.$, S = null, busy = false, year, month, retries = 0;
   var menuDate = null, menuAdding = false, selectedCell = null, suppressClick = false, touchTimer = null, touchXY = null;
   var pendingDel = null, customDirty = false;
+  var ANN_TYPES = { none: '不重复', week: '每周', month: '每月', quarter: '每季度', year: '每年' };
   var FOLD_KEY = 'my_workday_fold2', fold = {};
   try { fold = JSON.parse(localStorage.getItem(FOLD_KEY) || '{}') || {}; } catch (e) { fold = {}; }
 
@@ -171,13 +175,8 @@
     }
     (h.off || []).forEach(function (d) { consider(d, names[d] || '假期'); });
     (S.workday.anniversaries || []).forEach(function (a) {
-      var raw = String(a.date || '');
-      if (a.repeat) {
-        var md = raw.length === 5 ? raw : raw.slice(5);
-        if (!/^\d{2}-\d{2}$/.test(md)) return;
-        var y = Number(t.slice(0, 4)), first = y + '-' + md;
-        consider(first < t ? (y + 1) + '-' + md : first, a.name);
-      } else consider(raw, a.name);
+      var d = annNext(a, t);
+      if (d) consider(d, a.name);
     });
     return best;
   }
@@ -214,11 +213,11 @@
       : '<div class="num red">' + S.maintenance.due_total + ' 项</div><div class="lbl">维护已到期</div>';
     $('stats').innerHTML =
       '<div class="stat"><div class="num blue">' + ms.left + ' / ' + ms.total + '</div>' +
-        '<div class="lbl">' + year + ' 年 ' + month + ' 月工作日 · 剩余/总数</div></div>' +
+        '<div class="lbl">' + year + ' 年 ' + month + ' 月 · 剩余/总数</div></div>' +
       '<div class="stat" data-jump-today style="cursor:pointer" title="回到本月并定位到今天">' +
         '<div class="num">' + (w.today_work ? '上班' : '休息') + '</div>' +
         '<div class="lbl">今天 · ' + S.today + ' · ' + M.esc(w.today_label || '') + '</div></div>' +
-      '<div class="stat">' + third + '</div>';
+      '<div class="stat"' + (ev ? ' data-jump-event style="cursor:pointer" title="跳到下一个节假日或纪念日"' : '') + '>' + third + '</div>';
     var h = S.holidays || {}, hasYear = (h.off || []).concat(h.makeup || [])
       .some(function (d) { return Number(String(d).slice(0, 4)) === year; });
     $('sourceLabel').textContent = '放假数据：' +
@@ -231,8 +230,60 @@
     selectedCell = S.today;
     renderStats(); renderCal();
   }
+  function jumpToEvent() {
+    var ev = nextSpecialDay();
+    if (!ev || !ev.date) return;
+    var t = M.dateOf(ev.date);
+    year = t.getFullYear(); month = t.getMonth() + 1;
+    selectedCell = ev.date;
+    renderStats(); renderCal();
+  }
+  function annType(a) {
+    var r = a.repeat;
+    if (r === true) return 'year';
+    if (r === false || r == null) return String(a.date || '').length === 5 ? 'year' : 'none';
+    return ANN_TYPES[r] ? r : 'none';
+  }
+  function annDate(a) {
+    var raw = String(a.date || '');
+    if (/^\d{2}-\d{2}$/.test(raw)) return S.today.slice(0, 4) + '-' + raw;
+    return raw;
+  }
+  function annNext(a, t) {
+    var type = annType(a), start = annDate(a);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(start)) return null;
+    var s = M.dateOf(start), today = M.dateOf(t);
+    if (type === 'none') return start >= t ? start : null;
+    if (type === 'week') {
+      if (start >= t) return start;
+      var k = Math.floor(M.dayDiff(t, start) / 7) + 1;
+      return iso(new Date(s.getTime() + k * 7 * 86400000));
+    }
+    if (type === 'year') {
+      var y = today.getFullYear(), md = start.slice(5), first = y + '-' + md;
+      return first < t ? (y + 1) + '-' + md : first;
+    }
+    var step = type === 'quarter' ? 3 : 1;
+    for (var n = 0; n < 240; n++) {
+      var m = s.getMonth() + n * step;
+      var last = new Date(s.getFullYear(), m + 1, 0).getDate();
+      var d = new Date(s.getFullYear(), m, Math.min(s.getDate(), last));
+      var key = iso(d);
+      if (key >= t) return key;
+    }
+    return null;
+  }
   function annOn(a, key) {
-    return a.repeat ? String(a.date) === key.slice(5) : String(a.date) === key;
+    var type = annType(a), start = annDate(a), k = M.dateOf(key);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(start)) return false;
+    var s = M.dateOf(start);
+    if (type === 'none') return key === start;
+    if (type === 'week') return k >= s && Math.round((k - s) / 86400000) % 7 === 0;
+    if (type === 'month') return k >= s && k.getDate() === s.getDate();
+    if (type === 'quarter') return k >= s && k.getDate() === s.getDate() &&
+      ((k.getFullYear() - s.getFullYear()) * 12 + k.getMonth() - s.getMonth()) % 3 === 0;
+    if (type === 'year') return key.slice(5) === start.slice(5);
+    return false;
   }
   function cellData(key) {
     var todos = (S.workday.todos || []).filter(function (t) { return t.date === key; });
@@ -361,7 +412,7 @@
     var list = (S.workday.anniversaries || []).slice().sort(function (a, b) { return a.date.localeCompare(b.date); });
     $('anns').innerHTML = list.length ? list.map(function (a) {
       return '<div class="row"><span class="txt ann-text" data-ann-edit="' + M.esc(a.id) + '" title="点击编辑">' + M.esc(a.name) + '</span>' +
-        '<span class="sub">' + M.esc(a.date) + (a.repeat ? ' · 每年' : '') + '</span>' +
+        '<span class="sub">' + M.esc(annDate(a)) + ' · ' + ANN_TYPES[annType(a)] + '</span>' +
         '<button class="ghost danger" data-ann-del="' + M.esc(a.id) + '">' + delText('ann', a.id) + '</button></div>';
     }).join('') : '<div class="hint">还没有纪念日。</div>';
   }
@@ -406,8 +457,9 @@
   $('prevM').onclick = function () { month--; if (month < 1) { month = 12; year--; } renderStats(); renderCal(); };
   $('nextM').onclick = function () { month++; if (month > 12) { month = 1; year++; } renderStats(); renderCal(); };
   $('stats').onclick = function (e) {
-    var card = e.target.closest && e.target.closest('[data-jump-today]');
-    if (card && S) jumpToday();
+    if (!S) return;
+    if (e.target.closest && e.target.closest('[data-jump-today]')) { jumpToday(); return; }
+    if (e.target.closest && e.target.closest('[data-jump-event]')) jumpToEvent();
   };
   $('cal').onclick = function (e) {
     if (suppressClick) { suppressClick = false; return; }
@@ -536,21 +588,17 @@
     $('annTitle').textContent = id ? '编辑纪念日' : '新增纪念日';
     var a = id ? (S.workday.anniversaries || []).filter(function (x) { return x.id === id; })[0] : null;
     $('annName').value = a ? a.name : '';
-    $('annDate').value = a ? a.date : (date ? date.slice(5) : '');
-    $('annRepeat').value = a ? (a.repeat ? '1' : '0') : '1';
+    $('annDate').value = a ? annDate(a) : (date || S.today);
+    $('annRepeat').value = a ? annType(a) : 'year';
     $('annName').focus();
   }
   function closeAnn() { $('annMask').hidden = true; editingAnn = null; }
   function saveAnn() {
     var name = $('annName').value.trim(), date = $('annDate').value.trim();
     if (!name || !date) { M.toast('名称和日期都要填', true); return; }
-    if (!/^\d{2}-\d{2}$/.test(date) && !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
-      M.toast('日期格式应为 05-20 或 2026-12-01', true); return;
-    }
-    var mo = Number(date.slice(-5, -3)), dd = Number(date.slice(-2));
-    if (mo < 1 || mo > 12 || dd < 1 || dd > 31) { M.toast('日期不合法', true); return; }
-    var rep = $('annRepeat').value === '1';
-    if (rep && /^\d{4}-\d{2}-\d{2}$/.test(date)) date = date.slice(5);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) { M.toast('请用日期控件选择日期', true); return; }
+    var rep = $('annRepeat').value;
+    if (!ANN_TYPES[rep]) rep = 'none';
     var next = (S.workday.anniversaries || []).slice();
     if (editingAnn) {
       next = next.map(function (a) {
