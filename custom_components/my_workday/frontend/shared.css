@@ -317,3 +317,14 @@ input[type=checkbox]{width:22px;height:22px;min-height:22px;padding:0;margin:0;f
 .rec-ent input[type=text]{width:100%;min-width:0;flex:none}
 .rec-off{grid-column:1 / -1}
 @media (max-width:620px){.rec-ent{grid-template-columns:1fr}.rec-check{min-height:40px}input[type=checkbox]{width:24px;height:24px;min-height:24px}}
+
+:root{--act:var(--accent)}
+.todo-text,.ann-text,.due-click,.menu .mt,.proj-title,.item-title b[data-itemname],.items-head h2,.fold-head h2,.group[data-donegroup],.item-meta-toggle{color:var(--act);text-decoration:underline dotted;text-underline-offset:3px;text-decoration-color:var(--act);cursor:pointer;font-weight:500;transition:color .15s}
+.todo-text:hover,.ann-text:hover,.due-click:hover,.menu .mt:hover,.proj-title:hover,.item-title b[data-itemname]:hover,.items-head h2:hover,.fold-head h2:hover,.group[data-donegroup]:hover,.item-meta-toggle:hover{text-decoration-style:solid;text-decoration-color:currentColor}
+.rec-row,.due-row,.item-title{position:relative;padding-left:12px}
+.rec-row::before,.due-row::before,.item-title::before{content:"";position:absolute;left:0;top:9px;bottom:9px;width:3px;border-radius:2px;background:var(--act);opacity:.45}
+.rec-row:hover::before,.due-row:hover::before,.item-title:hover::before{opacity:1}
+.fold-arrow,.chev{color:var(--act)}
+.stat[data-jump-today] .lbl,.stat[data-jump-event] .lbl{color:var(--act)}
+.cell:hover{border-color:var(--act)}
+.fold:hover b{color:var(--act)}
