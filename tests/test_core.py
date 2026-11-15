@@ -219,15 +219,20 @@ class TestRepo(unittest.TestCase):
 
     def test_maintenance_legacy_ui(self):
         html = (PKG / 'frontend' / 'maintenance.html').read_text(encoding='utf-8')
-        for token in ('projStep1', 'projStep2', 'projNext', 'projUnitLabel',
-                      'data-pm=', 'logtable', 'mt-side', 'contextmenu',
-                      'counterValue', 'data-lognote'):
+        for token in ('id="projMask"', 'id="itemMask"', 'id="logMask"', 'id="recMask"',
+                      'id="unitBox"', 'syncUnit', 'autoSlug', 'data-item=',
+                      '记录多项维护', 'data-pm=', 'logtable', 'mt-side',
+                      'contextmenu', 'counterValue', 'data-lognote'):
             self.assertIn(token, html)
+        for gone in ('projStep1', 'projStep2', 'projNext', 'projUnitLabel',
+                     'data-baseline=', 'data-logone=', 'data-edit=', 'set_baseline'):
+            self.assertNotIn(gone, html)
 
     def test_layout_css_fixes(self):
         css = (PKG / 'frontend' / 'shared.css').read_text(encoding='utf-8')
         self.assertIn('.mt-layout{display:flex;flex-direction:row;', css)
-        self.assertIn('#overview{grid-template-columns:repeat(4,', css)
+        self.assertIn('#overview{grid-template-columns:repeat(2,', css)
+        self.assertNotIn('#overview{grid-template-columns:repeat(4,', css)
 
     def test_stats_follow_month_and_jump_today(self):
         html = (PKG / 'frontend' / 'workday.html').read_text(encoding='utf-8')
@@ -247,12 +252,15 @@ class TestRepo(unittest.TestCase):
 
     def test_day_label_and_menu_modes(self):
         html = (PKG / 'frontend' / 'workday.html').read_text(encoding='utf-8')
-        for token in ('function dayLabel(', 'function baseWork(', 'function customMode(',
-                      'if (!curWork)', 'if (cm) modes +='):
+        for token in ('function dayLabel(', 'function baseWork(', 'function customMode('):
             self.assertIn(token, html)
-        self.assertNotIn("' · ' + (c.work ? '上班' : '休息')", html)
+        for gone in ('data-mclose', 'data-mday=', '算上班</button>',
+                     '算休息</button>', '恢复安排</button>'):
+            self.assertNotIn(gone, html)
         css = (PKG / 'frontend' / 'shared.css').read_text(encoding='utf-8')
         self.assertIn('.stat .sub2', css)
+        self.assertIn('.cell .d{font-size:17px', css)
+        self.assertIn('.cal-head div{font-size:13px', css)
 
     def test_delete_project_confirmation_works(self):
         html = (PKG / 'frontend' / 'maintenance.html').read_text(encoding='utf-8')
@@ -306,6 +314,20 @@ class TestRepo(unittest.TestCase):
                       'nav-arrow', '@media (max-width:620px)', 'stat[data-jump-today]:hover'):
             self.assertIn(token, css)
         self.assertIn('.mt-side .tab.add', css)
+
+    def test_workday_add_modals(self):
+        html = (PKG / 'frontend' / 'workday.html').read_text(encoding='utf-8')
+        for token in ('id="todoMask"', 'id="annMask"', 'function openTodo()',
+                      'function openAnn()', 'id="todoSave"', 'id="annSave"',
+                      'closeTodo()', 'closeAnn()'):
+            self.assertIn(token, html)
+        self.assertNotIn('id="todoForm"', html)
+        self.assertNotIn('id="annForm"', html)
+
+    def test_slugify_cjk_fallback(self):
+        mnt = _load('maintenance')
+        self.assertTrue(mnt.slugify('卡罗拉').startswith('p_'))
+        self.assertEqual(mnt.slugify('Corolla'), 'corolla')
 
     def test_frontend_routing_and_ws_snapshot(self):
         init = (PKG / '__init__.py').read_text(encoding='utf-8')

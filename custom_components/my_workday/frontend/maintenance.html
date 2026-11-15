@@ -13,8 +13,9 @@
 <main class="mt-layout">
   <div class="mt-main">
     <section class="card">
-      <div class="card-head"><h2 id="projectHead">维护项目</h2><span class="spacer"></span>
-        <span class="hint" id="projectType"></span></div>
+      <div class="card-head proj-head"><h2 id="projectHead">维护项目</h2><span class="spacer"></span>
+        <span class="hint" id="projectType"></span>
+        <button class="primary" id="logOpen">记录多项维护</button></div>
       <div class="stats" id="overview"></div>
       <div class="form" id="counterBox" hidden>
         <div><label id="counterLabel">当前计数</label><input type="number" id="counterValue"></div>
@@ -25,27 +26,7 @@
 
     <section class="card">
       <div class="card-head"><h2>维护小项</h2><span class="spacer"></span>
-        <button class="primary" id="logOpen">记录一次维护</button>
         <button class="primary" id="itemAdd">+ 新增小项</button></div>
-
-      <div class="form" id="logForm" hidden>
-        <div><label>维护日期</label><input type="date" id="logDate"></div>
-        <div><label id="logCounterLabel">当前计数</label><input type="number" id="logCounter"></div>
-        <div class="full hint">勾哪行就记哪行，每行可写自己的备注。</div>
-        <div class="full" id="logItems"></div>
-        <div class="full"><button class="primary" id="logSave">保存这次维护</button>
-          <button class="ghost" id="logCancel">取消</button></div>
-      </div>
-
-      <div class="form" id="itemForm" hidden>
-        <input type="hidden" id="itemId">
-        <div><label>维护内容</label><input id="itemName" placeholder="机油 + 机滤"></div>
-        <div><label>间隔天数</label><input type="number" id="itemDays" value="180"></div>
-        <div><label>间隔计数（可留空）</label><input type="number" id="itemInterval" placeholder="10000"></div>
-        <div class="full"><label>备注</label><input id="itemNote"></div>
-        <div class="full"><button class="primary" id="itemSave">保存</button>
-          <button class="ghost" id="itemCancel">取消</button></div>
-      </div>
       <div id="items"></div>
     </section>
 
@@ -55,34 +36,65 @@
       <div id="history"></div>
     </section>
   </div>
-
   <aside class="mt-side" id="projSide"></aside>
 </main>
 
 <div class="modal-mask" id="projMask" hidden>
-  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="projFormTitle">
-    <div class="modal-head"><b id="projFormTitle">新建维护项目</b>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="projTitle">
+    <div class="modal-head"><b id="projTitle">新建维护项目</b>
       <button class="ghost" id="projClose" aria-label="关闭">×</button></div>
     <div class="modal-body">
-      <div id="projStep1">
-        <div><label>项目名称</label><input id="projName" placeholder="卡罗拉"></div>
-        <div><label>英文标识（中文名必填）</label><input id="projSlug" placeholder="corolla"></div>
-        <div><label>类型（决定预置小项）</label><select id="projType">
-          <option value="vehicle">车辆</option><option value="appliance">家电</option>
-          <option value="furniture">家具</option><option value="area">区域</option>
-          <option value="custom">自己建</option></select></div>
-        <div><label>这个项目要计数吗</label><select id="projCounter">
-          <option value="0">不要</option><option value="1">要</option></select></div>
-        <div class="full"><button class="primary" id="projNext">下一步</button>
-          <button class="ghost" id="projCancel">取消</button></div>
-      </div>
-      <div id="projStep2" hidden>
-        <div><label>计数单位</label><input id="projUnit" placeholder="公里 / 次 / 小时"></div>
-        <div><label>在界面上叫它什么（可留空）</label><input id="projUnitLabel" placeholder="留空按单位推断"></div>
-        <div class="full"><button class="primary" id="projSave">创建</button>
-          <button class="ghost" id="projBack">上一步</button>
-          <button class="ghost" id="projCancel2">取消</button></div>
-      </div>
+      <div><label>项目名称</label><input id="projName" placeholder="卡罗拉"></div>
+      <div><label>这个项目要计数吗</label><select id="projCounter">
+        <option value="0">不要</option><option value="1">要</option></select></div>
+      <div id="unitBox" hidden><label>计数单位</label><input id="projUnit" placeholder="公里 / 次 / 小时"></div>
+      <div class="full"><button class="primary" id="projSave">创建</button>
+        <button class="ghost" id="projCancel">取消</button></div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-mask" id="itemMask" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="itemTitle">
+    <div class="modal-head"><b id="itemTitle">新增维护小项</b>
+      <button class="ghost" id="itemClose" aria-label="关闭">×</button></div>
+    <div class="modal-body">
+      <input type="hidden" id="itemId">
+      <div><label>维护内容</label><input id="itemName" placeholder="机油 + 机滤"></div>
+      <div><label>间隔天数</label><input type="number" id="itemDays" value="180"></div>
+      <div><label>间隔计数（可留空）</label><input type="number" id="itemInterval" placeholder="10000"></div>
+      <div><label>备注</label><input id="itemNote"></div>
+      <div class="full"><button class="primary" id="itemSave">保存</button>
+        <button class="ghost" id="itemCancel">取消</button></div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-mask" id="logMask" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="logTitle">
+    <div class="modal-head"><b id="logTitle">记录多项维护</b>
+      <button class="ghost" id="logClose" aria-label="关闭">×</button></div>
+    <div class="modal-body">
+      <div><label>维护日期</label><input type="date" id="logDate"></div>
+      <div id="logCounterBox" hidden><label id="logCounterLabel">当前计数</label><input type="number" id="logCounter"></div>
+      <div><span class="hint">勾哪行就记哪行，每行可写自己的备注。</span></div>
+      <div id="logItems"></div>
+      <div class="full"><button class="primary" id="logSave">保存这次维护</button>
+        <button class="ghost" id="logCancel">取消</button></div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-mask" id="recMask" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="recTitle">
+    <div class="modal-head"><b id="recTitle">修改维护记录</b>
+      <button class="ghost" id="recClose" aria-label="关闭">×</button></div>
+    <div class="modal-body">
+      <input type="hidden" id="recId"><input type="hidden" id="recItem">
+      <div><label>日期</label><input type="date" id="recDate"></div>
+      <div><label>备注</label><input id="recNote"></div>
+      <div class="full"><button class="primary" id="recSave">保存</button>
+        <button class="ghost" id="recCancel">取消</button></div>
     </div>
   </div>
 </div>
@@ -94,24 +106,20 @@
   var M = window.MW, $ = M.$, S = null, busy = false, slug = null, expanded = {}, retries = 0;
   var menuSlug = null, editingSlug = null, deleteArmed = false, longTimer = null, touchXY = null;
   var lastCount = null, pendingDel = null;
+  var MASKS = ['projMask', 'itemMask', 'logMask', 'recMask'];
+
   function armDel(k) {
     if (pendingDel !== k) { pendingDel = k; return false; }
     pendingDel = null; return true;
   }
   function delText(k) { return pendingDel === k ? '确认删除' : '删除'; }
-
-  function retryLoad() {
-    if (retries >= 3) return;
-    retries++;
-    setTimeout(load, 2000);
-  }
+  function retryLoad() { if (retries >= 3) return; retries++; setTimeout(load, 2000); }
   function load() {
     if (busy || !M.isHA()) return Promise.resolve();
     busy = true;
     return M.snapshot().then(function (d) {
       if (!d || !d.maintenance) throw new Error('快照格式异常：' + JSON.stringify(d).slice(0, 160));
-      S = d;
-      retries = 0;
+      S = d; retries = 0;
       var projects = d.maintenance.projects || [];
       if (!projects.length) slug = null;
       else if (!projects.some(function (p) { return p.slug === slug; })) slug = projects[0].slug;
@@ -146,16 +154,16 @@
     a.download = name; a.click();
     setTimeout(function () { URL.revokeObjectURL(a.href); }, 2000);
   }
+  function hideModals() { MASKS.forEach(function (id) { $(id).hidden = true; }); }
   function resetForms() {
-    ['projMask', 'logForm', 'itemForm'].forEach(function (id) { $(id).hidden = true; });
-    pendingDel = null;
-    $('projStep1').hidden = false; $('projStep2').hidden = true;
-    $('itemId').value = '';
-    editingSlug = null; deleteArmed = false;
+    hideModals();
+    $('itemId').value = ''; $('recId').value = '';
+    editingSlug = null; deleteArmed = false; pendingDel = null;
     closeMenu();
   }
   function render() {
-    renderSide(); renderOverview(); renderItems(); renderHistory(); renderLogItems();
+    renderSide(); renderOverview(); renderItems(); renderHistory();
+    if (!$('logMask').hidden) renderLogItems();
     if (menuSlug) renderMenu();
   }
   function renderSide() {
@@ -176,16 +184,12 @@
       $('counterBox').hidden = true;
       return;
     }
-    var ok = 0;
-    (s.items || []).forEach(function (i) { if (i.status === 'ok') ok++; });
     $('projectHead').textContent = p.name;
     var labels = { vehicle: '车辆', appliance: '家电', furniture: '家具', area: '区域', custom: '自己建' };
     $('projectType').textContent = labels[p.type] || '';
     $('overview').innerHTML =
       '<div class="stat"><div class="num red">' + s.due_count + '</div><div class="lbl">已到期</div></div>' +
-      '<div class="stat"><div class="num orange">' + s.soon_count + '</div><div class="lbl">快到了</div></div>' +
-      '<div class="stat"><div class="num">' + ok + '</div><div class="lbl">正常</div></div>' +
-      '<div class="stat"><div class="num">' + s.unset_count + '</div><div class="lbl">未设基准</div></div>';
+      '<div class="stat"><div class="num orange">' + s.soon_count + '</div><div class="lbl">快到了</div></div>';
     $('counterBox').hidden = !p.need_counter;
     if (p.need_counter) {
       $('counterLabel').textContent = '更新当前' + (p.counter_label || '计数') + '（' + (p.counter_unit || '') + '）';
@@ -208,22 +212,20 @@
       var st = stateOf(i.id);
       var left = st.remaining_days == null ? '—' : (st.remaining_days <= 0 ? '已到期' : '还剩 ' + st.remaining_days + ' 天');
       var recs = itemRecords(p, i.id);
-      var head = '<div class="mt-item"><div class="top"><b>' + M.esc(i.name) + '</b>' + pill(st.status) + '</div>' +
+      var head = '<div class="mt-item"><div class="top item-title" data-item="' + M.esc(i.id) + '" title="点击编辑">' +
+        '<b>' + M.esc(i.name) + '</b>' + pill(st.status) + '</div>' +
         '<div class="meta">上次维护：' + M.esc(i.last_date || '未设') + ' · ' + left +
         (p.need_counter && st.remaining_counter != null ? ' · 还剩 ' + st.remaining_counter + ' ' + M.esc(p.counter_unit || '') : '') +
         '</div>' +
         (i.note ? '<div class="meta">' + M.esc(i.note) + '</div>' : '') +
         '<div class="acts">' +
-        '<button data-edit="' + M.esc(i.id) + '">编辑</button>' +
-        '<button data-baseline="' + M.esc(i.id) + '">设基准</button>' +
-        '<button data-logone="' + M.esc(i.id) + '">记录</button>' +
         '<button data-history="' + M.esc(i.id) + '">维护记录 (' + recs.length + ') ' + (expanded[i.id] ? '▴' : '▾') + '</button>' +
         '<button class="danger" data-del="' + M.esc(i.id) + '">' + delText('item:' + i.id) + '</button></div>';
       if (!expanded[i.id]) return head + '</div>';
       var rows = recs.length ? recs.map(function (r) {
         var e = (r.entries || []).filter(function (x) { return x.item_id === i.id; })[0] || {};
-        return '<div class="row"><span class="sub">' + M.esc(r.date) +
-          (r.counter != null ? ' · ' + M.esc(r.counter) : '') + '</span>' +
+        return '<div class="row" data-rdate="' + M.esc(r.date) + '" data-rnote="' + M.esc(e.note || '') + '">' +
+          '<span class="sub">' + M.esc(r.date) + (r.counter != null ? ' · ' + M.esc(r.counter) : '') + '</span>' +
           '<span class="txt">' + M.esc(e.note || '') + '</span>' +
           '<button class="ghost" data-redit="' + M.esc(r.id) + '" data-ri="' + M.esc(i.id) + '">改</button>' +
           '<button class="ghost danger" data-rdel="' + M.esc(r.id) + '" data-ri="' + M.esc(i.id) + '">删</button></div>';
@@ -269,7 +271,7 @@
     el.innerHTML = '<h3><button class="ghost" data-pmclose style="float:right;padding:1px 7px">×</button>项目操作</h3>' +
       '<div class="modes" style="flex-direction:column;align-items:stretch">' +
       '<button data-pm="edit">编辑项目</button>' +
-      '<button data-pm="log">记录一次维护</button>' +
+      '<button data-pm="log">记录多项维护</button>' +
       '<button data-pm="json">导出 JSON 备份</button>' +
       '<button data-pm="md">导出 Markdown</button>' +
       '<button data-pm="refresh">刷新数据</button>' +
@@ -279,47 +281,82 @@
     el.style.top = Math.max(6, Math.min((touchXY && touchXY.y) || 20, window.innerHeight - h - 12)) + 'px';
   }
   function closeMenu() { $('projMenu').hidden = true; menuSlug = null; deleteArmed = false; }
+  function defaultLabel(unit) {
+    return ({ '公里': '里程', '次': '使用次数', '小时': '运行小时' })[unit] || unit;
+  }
+  function syncUnit() { $('unitBox').hidden = $('projCounter').value !== '1'; }
+  function autoSlug(name) {
+    var clean = String(name || '').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+    if (clean) return clean;
+    var h = 5381;
+    for (var i = 0; i < name.length; i++) h = ((h * 33) ^ name.charCodeAt(i)) >>> 0;
+    return 'p_' + h.toString(36);
+  }
   function openForm(edit) {
     resetForms();
     editingSlug = edit ? slug : null;
     $('projMask').hidden = false;
-    $('projFormTitle').textContent = edit ? '编辑项目' : '新建维护项目';
-    $('projStep1').hidden = false; $('projStep2').hidden = true;
+    $('projTitle').textContent = edit ? '编辑项目' : '新建维护项目';
+    $('projSave').textContent = edit ? '保存修改' : '创建';
     var p = project();
     if (edit && p) {
-      $('projName').value = p.name; $('projSlug').value = p.slug;
-      $('projType').value = p.type || 'custom';
+      $('projName').value = p.name;
       $('projCounter').value = p.need_counter ? '1' : '0';
       $('projUnit').value = p.counter_unit || '';
-      $('projUnitLabel').value = p.counter_label || '';
     } else {
-      $('projName').value = ''; $('projSlug').value = '';
-      $('projType').value = 'vehicle'; $('projCounter').value = '0';
-      $('projUnit').value = ''; $('projUnitLabel').value = '';
+      $('projName').value = ''; $('projCounter').value = '0'; $('projUnit').value = '';
     }
+    syncUnit();
     $('projName').focus();
   }
-  function defaultLabel(unit) {
-    return ({ '公里': '里程', '次': '使用次数', '小时': '运行小时' })[unit] || unit;
-  }
   function submitProject() {
-    var name = $('projName').value.trim(), pslug = $('projSlug').value.trim();
+    var name = $('projName').value.trim();
     var unit = $('projUnit').value.trim();
-    var label = $('projUnitLabel').value.trim() || defaultLabel(unit);
     var need = $('projCounter').value === '1';
     if (!name) { M.toast('项目名称不能为空', true); return; }
-    if (!editingSlug && !pslug) { M.toast('中文项目名需要填英文标识', true); return; }
-    var data = { name: name, need_counter: need, counter_unit: need ? unit : '', counter_label: need ? label : '' };
-    $('projMask').hidden = true;
+    if (need && !unit) { M.toast('要计数请填单位', true); return; }
+    var data = { name: name, need_counter: need,
+      counter_unit: need ? unit : '', counter_label: need ? defaultLabel(unit) : '' };
+    hideModals();
     if (editingSlug) {
-      data.slug = editingSlug;
-      editingSlug = null;
+      data.slug = editingSlug; editingSlug = null;
       write('update_project', data);
     } else {
-      data.slug = pslug; data.type = $('projType').value;
-      slug = pslug; lastCount = null;
+      var gen = autoSlug(name);
+      data.slug = gen; slug = gen; lastCount = null;
       write('add_project', data);
     }
+  }
+  function openItemForm(id) {
+    var p = project(); if (!p) return;
+    resetForms();
+    $('itemMask').hidden = false;
+    $('itemTitle').textContent = id ? '编辑维护小项' : '新增维护小项';
+    var i = id ? (p.items || []).filter(function (x) { return x.id === id; })[0] : null;
+    $('itemId').value = i ? i.id : '';
+    $('itemName').value = i ? i.name : '';
+    $('itemDays').value = i ? (i.interval_days == null ? '' : i.interval_days) : 180;
+    $('itemInterval').value = i && i.interval_counter != null ? i.interval_counter : '';
+    $('itemNote').value = i ? (i.note || '') : '';
+    $('itemName').focus();
+  }
+  function openLogForm() {
+    var p = project();
+    if (!p) { M.toast('先新建一个项目', true); return; }
+    resetForms();
+    $('logMask').hidden = false;
+    $('logDate').value = S.today;
+    $('logCounterBox').hidden = !p.need_counter;
+    $('logCounterLabel').textContent = '当前' + (p.counter_label || '计数');
+    $('logCounter').value = p.counter == null ? '' : p.counter;
+    renderLogItems();
+  }
+  function openRecForm(recordId, itemId, date, note) {
+    resetForms();
+    $('recMask').hidden = false;
+    $('recId').value = recordId; $('recItem').value = itemId;
+    $('recDate').value = date || S.today; $('recNote').value = note || '';
+    $('recDate').focus();
   }
 
   $('projSide').onclick = function (e) {
@@ -343,9 +380,7 @@
     var t = e.target.closest && e.target.closest('[data-tab]'); if (!t || !e.touches.length) return;
     touchXY = { x: e.touches[0].clientX, y: e.touches[0].clientY };
     longTimer = setTimeout(function () {
-      longTimer = null;
-      menuSlug = t.dataset.tab;
-      renderMenu();
+      longTimer = null; menuSlug = t.dataset.tab; renderMenu();
     }, 600);
   }, { passive: true });
   $('projSide').addEventListener('touchend', function () { if (longTimer) { clearTimeout(longTimer); longTimer = null; } });
@@ -358,7 +393,7 @@
     var armed = deleteArmed;
     closeMenu();
     if (act === 'edit') { slug = target; openForm(true); return; }
-    if (act === 'log') { slug = target; render(); $('logForm').hidden = false; $('logDate').value = S.today; return; }
+    if (act === 'log') { slug = target; render(); openLogForm(); return; }
     if (act === 'refresh') { load(); return; }
     if (act === 'json' || act === 'md') {
       var p = (S.maintenance.projects || []).filter(function (x) { return x.slug === target; })[0];
@@ -375,31 +410,19 @@
       write('delete_project', { slug: target });
     }
   };
-  $('projNext').onclick = function () {
-    if ($('projCounter').value === '1') { $('projStep1').hidden = true; $('projStep2').hidden = false; }
-    else submitProject();
-  };
-  $('projBack').onclick = function () { $('projStep1').hidden = false; $('projStep2').hidden = true; };
+  $('projCounter').onchange = syncUnit;
   $('projSave').onclick = submitProject;
   $('projCancel').onclick = resetForms;
-  $('projCancel2').onclick = resetForms;
   $('projClose').onclick = resetForms;
-  $('projMask').onclick = function (e) { if (e.target === this) resetForms(); };
   $('counterValue').onchange = function () {
     var p = project(); if (!p) return;
     var raw = String($('counterValue').value == null ? '' : $('counterValue').value).trim();
     if (raw === '' || !isFinite(Number(raw))) { M.toast('请填写有效的计数值', true); return; }
     write('set_counter', { slug: p.slug, value: Number(raw) });
   };
-  $('logOpen').onclick = function () {
-    var f = $('logForm'); f.hidden = !f.hidden;
-    if (!f.hidden) {
-      $('logDate').value = S.today;
-      var p = project();
-      $('logCounter').value = p && p.counter != null ? p.counter : '';
-    }
-  };
-  $('logCancel').onclick = function () { $('logForm').hidden = true; };
+  $('logOpen').onclick = openLogForm;
+  $('logCancel').onclick = function () { $('logMask').hidden = true; };
+  $('logClose').onclick = function () { $('logMask').hidden = true; };
   $('logSave').onclick = function () {
     var ids = Array.prototype.slice.call(document.querySelectorAll('[data-logitem]:checked')).map(function (x) { return x.value; });
     if (!ids.length) { M.toast('至少勾选一个小项', true); return; }
@@ -410,16 +433,13 @@
     });
     var data = { slug: slug, item_ids: ids, date: $('logDate').value, item_notes: notes };
     if ($('logCounter').value !== '') data.counter = Number($('logCounter').value);
-    $('logForm').hidden = true;
+    hideModals();
     var btn = this; btn.disabled = true;
     write('log_service', data).finally(function () { btn.disabled = false; });
   };
-  $('itemAdd').onclick = function () {
-    $('itemForm').hidden = false; $('itemId').value = '';
-    $('itemName').value = ''; $('itemDays').value = 180;
-    $('itemInterval').value = ''; $('itemNote').value = '';
-  };
-  $('itemCancel').onclick = function () { $('itemForm').hidden = true; };
+  $('itemAdd').onclick = function () { openItemForm(null); };
+  $('itemCancel').onclick = function () { $('itemMask').hidden = true; };
+  $('itemClose').onclick = function () { $('itemMask').hidden = true; };
   $('itemSave').onclick = function () {
     var id = $('itemId').value;
     var data = { slug: slug, name: $('itemName').value.trim(),
@@ -429,75 +449,46 @@
     if (String($('itemDays').value == null ? '' : $('itemDays').value).trim() === '') { M.toast('间隔天数要填', true); return; }
     if (id) { data.item_id = id; write('update_item', data); }
     else write('add_item', data);
-    $('itemForm').hidden = true;
+    hideModals();
   };
   $('items').onclick = function (e) {
     var p = project(); if (!p) return;
     var t = e.target;
-    var edit = t.dataset.edit;
-    if (edit) {
-      var i = (p.items || []).filter(function (x) { return x.id === edit; })[0];
-      $('itemForm').hidden = false; $('itemId').value = i.id;
-      $('itemName').value = i.name; $('itemDays').value = i.interval_days;
-      $('itemInterval').value = i.interval_counter == null ? '' : i.interval_counter;
-      $('itemNote').value = i.note || '';
-      return;
-    }
+    var title = t.closest && t.closest('[data-item]');
+    if (title) { openItemForm(title.dataset.item); return; }
     var del = t.dataset.del;
     if (del) {
       if (!armDel('item:' + del)) { renderItems(); return; }
       write('delete_item', { slug: slug, item_id: del }); return;
     }
-    var one = t.dataset.logone;
-    if (one) {
-      $('logForm').hidden = false;
-      $('logDate').value = S.today;
-      $('logCounter').value = p.counter == null ? '' : p.counter;
-      renderLogItems();
-      var box = document.querySelector('[data-logitem][value="' + one + '"]');
-      if (box) box.checked = true;
-      M.toast('只记「' + ((p.items || []).filter(function (x) { return x.id === one; })[0] || {}).name + '」这一项');
-      return;
-    }
     var hist = t.dataset.history;
     if (hist) { expanded[hist] = !expanded[hist]; renderItems(); return; }
-    var base = t.dataset.baseline;
-    if (base) {
-      var form = document.createElement('div');
-      form.className = 'form';
-      form.innerHTML = '<div><label>上次维护日期</label><input type="date" id="blDate" value="' + S.today + '"></div>' +
-        '<div><label>上次计数</label><input type="number" id="blCount"></div>' +
-        '<div class="full"><button class="primary" id="blSave">保存基准</button></div>';
-      t.closest('.mt-item').appendChild(form);
-      form.querySelector('#blSave').onclick = function () {
-        var d = { slug: slug, item_id: base, last_date: form.querySelector('#blDate').value };
-        var count = form.querySelector('#blCount').value;
-        if (count !== '') d.last_counter = Number(count);
-        write('set_baseline', d);
-      };
-      return;
-    }
     var rdel = t.dataset.rdel;
     if (rdel) { write('delete_record', { slug: slug, record_id: rdel, item_id: t.dataset.ri }); return; }
     var redit = t.dataset.redit;
     if (redit) {
-      var row = t.closest('.row');
-      var box2 = document.createElement('div');
-      box2.className = 'form';
-      box2.innerHTML = '<div><label>日期</label><input type="date" id="reDate" value="' + S.today + '"></div>' +
-        '<div><label>备注</label><input id="reNote" value="' + M.esc(row.querySelector('.txt').textContent) + '"></div>' +
-        '<div class="full"><button class="primary" id="reSave">保存</button></div>';
-      row.parentNode.appendChild(box2);
-      box2.querySelector('#reSave').onclick = function () {
-        write('update_record', { slug: slug, record_id: redit, item_id: t.dataset.ri,
-          date: box2.querySelector('#reDate').value, note: box2.querySelector('#reNote').value });
-      };
+      var row = t.closest && t.closest('.row');
+      var d = row && row.dataset ? row.dataset.rdate : '';
+      var n = row && row.dataset ? row.dataset.rnote : '';
+      openRecForm(redit, t.dataset.ri, d || S.today, n || '');
     }
   };
+  $('recCancel').onclick = function () { $('recMask').hidden = true; };
+  $('recClose').onclick = function () { $('recMask').hidden = true; };
+  $('recSave').onclick = function () {
+    if (!$('recDate').value) { M.toast('日期要填', true); return; }
+    var data = { slug: slug, record_id: $('recId').value, item_id: $('recItem').value,
+      date: $('recDate').value, note: $('recNote').value };
+    hideModals();
+    write('update_record', data);
+  };
+  MASKS.forEach(function (id) {
+    $(id).onclick = function (e) { if (e.target === this) hideModals(); };
+  });
   document.addEventListener('keydown', function (e) {
     if (e.key !== 'Escape') return;
     if (!$('projMenu').hidden) closeMenu();
-    if (!$('projMask').hidden) resetForms();
+    hideModals();
   });
   M.onUpdate(load);
   M.start();

@@ -10,7 +10,11 @@ from .workday import parse_date
 
 
 def slugify(name: str) -> str:
-    return re.sub(r"[^a-z0-9]+", "_", str(name or "").lower()).strip("_")
+    text = str(name or "").strip()
+    clean = re.sub(r"[^a-z0-9]+", "_", text.lower()).strip("_")
+    if clean:
+        return clean
+    return "p_" + hashlib.md5(text.encode("utf-8")).hexdigest()[:8]
 
 
 def _uid(prefix: str, *parts) -> str:

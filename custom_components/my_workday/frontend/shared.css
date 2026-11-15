@@ -105,8 +105,6 @@ main{max-width:920px;margin:0 auto;padding:14px;display:flex;flex-direction:colu
 .card-head select.mini{width:auto;min-width:88px;padding:5px 8px;font-size:13px}
 .group[data-donegroup]{cursor:pointer}
 .mt-layout{display:flex;flex-direction:row;gap:14px;align-items:flex-start;max-width:1100px;margin:0 auto}
-#overview{grid-template-columns:repeat(4,minmax(0,1fr))}
-@media (max-width:620px){#overview{grid-template-columns:repeat(2,minmax(0,1fr))}}
 .mt-main{flex:1;min-width:0;display:flex;flex-direction:column;gap:14px}
 .mt-side{width:190px;flex:none;display:flex;flex-direction:column;gap:6px;position:sticky;top:60px}
 .mt-side .tab{width:100%;text-align:left}
@@ -171,4 +169,22 @@ textarea{font-size:var(--fs-sm)}
   .mt-side .tab.add{flex-basis:100%;width:100%;order:2;position:static}
   .fold{padding:10px}
   .fold-body{padding:10px}
+}
+
+#overview{grid-template-columns:repeat(2,minmax(0,1fr))}
+.cell{min-height:58px;padding:5px 6px}
+.cell .d{font-size:17px;font-weight:600;line-height:1.25;letter-spacing:.2px}
+.cal-head div{font-size:13px;font-weight:500;letter-spacing:1px;padding:5px 0}
+.cell .lbl,.cell .todo1{font-size:11px}
+.cell .ct,.cell .cnt,.cell .mark{font-size:11px}
+.item-title{cursor:pointer;transition:background .15s;border-radius:6px;margin:-3px -4px;padding:3px 4px}
+.item-title:hover{background:var(--soft)}
+.proj-head{flex-wrap:wrap;row-gap:8px}
+.menu .mrow{font-size:13px}
+@media (max-width:620px){
+  #overview{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .cell{min-height:50px;padding:4px}
+  .cell .d{font-size:15px}
+  .cal-head div{font-size:12px;padding:4px 0}
+  .cell .lbl,.cell .todo1,.cell .ct,.cell .cnt,.cell .mark{font-size:10px}
 }

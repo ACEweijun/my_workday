@@ -30,10 +30,6 @@
     <div class="fold" data-fold="todos"><span class="chev">▸</span><b>我的待办</b><span class="spacer"></span>
       <span class="summary" id="todoSummary"></span><button class="ghost" id="todoAdd">+ 新增</button></div>
     <div class="fold-body" id="fold-todos" hidden>
-      <div class="form" id="todoForm" hidden>
-        <div><label>日期</label><input type="date" id="todoDate"></div>
-        <div class="full"><label>要做什么</label><input id="todoText" placeholder="回车保存 · Esc 取消"></div>
-      </div>
       <div id="todos"></div>
     </div>
   </section>
@@ -42,12 +38,6 @@
     <div class="fold" data-fold="anns"><span class="chev">▸</span><b>我的纪念日</b><span class="spacer"></span>
       <span class="summary" id="annSummary"></span><button class="ghost" id="annAdd">+ 新增</button></div>
     <div class="fold-body" id="fold-anns" hidden>
-      <div class="form" id="annForm" hidden>
-        <div><label>名称</label><input id="annName" placeholder="生日"></div>
-        <div><label>日期</label><input id="annDate" placeholder="05-20 或 2026-12-01"></div>
-        <div><label>每年重复</label><select id="annRepeat"><option value="1">是</option><option value="0">否</option></select></div>
-        <div class="full"><button class="primary" id="annSave">保存</button></div>
-      </div>
       <div id="anns"></div>
     </div>
   </section>
@@ -67,6 +57,32 @@
     <div class="fold-body" id="fold-due" hidden><div id="dueList"></div></div>
   </section>
 </main>
+
+<div class="modal-mask" id="todoMask" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="todoTitle">
+    <div class="modal-head"><b id="todoTitle">新增待办</b>
+      <button class="ghost" id="todoClose" aria-label="关闭">×</button></div>
+    <div class="modal-body">
+      <div><label>日期</label><input type="date" id="todoDate"></div>
+      <div><label>要做什么</label><input id="todoText" placeholder="回车保存"></div>
+      <div class="full"><button class="primary" id="todoSave">保存</button>
+        <button class="ghost" id="todoCancel">取消</button></div>
+    </div>
+  </div>
+</div>
+<div class="modal-mask" id="annMask" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="annTitle">
+    <div class="modal-head"><b id="annTitle">新增纪念日</b>
+      <button class="ghost" id="annClose" aria-label="关闭">×</button></div>
+    <div class="modal-body">
+      <div><label>名称</label><input id="annName" placeholder="生日"></div>
+      <div><label>日期</label><input id="annDate" placeholder="05-20 或 2026-12-01"></div>
+      <div><label>每年重复</label><select id="annRepeat"><option value="1">是</option><option value="0">否</option></select></div>
+      <div class="full"><button class="primary" id="annSave">保存</button>
+        <button class="ghost" id="annCancel">取消</button></div>
+    </div>
+  </div>
+</div>
 <script src="shared.js"></script>
 <script>
 (function () {
@@ -274,8 +290,7 @@
   function menuHtml() {
     if (!menuDate || !S) return '';
     var d = cellData(menuDate);
-    var h = '<h3><button class="ghost" data-mclose style="float:right;padding:1px 7px">×</button>' +
-      M.esc(menuDate) + '</h3>';
+    var h = '';
     h += '<div class="menu-add"><button class="primary" data-madd>' +
       (menuAdding ? '收起新增' : '+ 新增') + '</button></div>';
     if (menuAdding) {
@@ -305,13 +320,6 @@
         M.esc(x.project + ' · ' + x.name) + '</span></div>';
     });
     if (rows) h += '<div class="menu-existing">' + rows + '</div>';
-    var cm = customMode(menuDate), bw = baseWork(menuDate);
-    var curWork = cm ? cm === 'work' : bw;
-    var modes = '';
-    if (!curWork) modes += '<button data-mday="work">算上班</button>';
-    if (curWork) modes += '<button data-mday="rest">算休息</button>';
-    if (cm) modes += '<button data-mday="auto">恢复安排</button>';
-    h += '<div class="modes">' + modes + '</div>';
     return h;
   }
   function openMenu(key, x, y) {
@@ -477,7 +485,6 @@
   });
   $('cellMenu').onclick = function (e) {
     var t = e.target, key = menuDate;
-    if (t.dataset.mclose !== undefined) { closeMenu(); return; }
     if (t.dataset.madd !== undefined) {
       menuAdding = !menuAdding;
       if (!menuAdding) menuType = null;
@@ -537,20 +544,36 @@
   };
   document.addEventListener('keydown', function (e) {
     if (e.key === 'Escape' && !$('cellMenu').hidden) closeMenu();
+    if (e.key === 'Escape' && !$('todoMask').hidden) closeTodo();
+    if (e.key === 'Escape' && !$('annMask').hidden) closeAnn();
   });
-  $('todoAdd').onclick = function (e) {
-    if (e && e.stopPropagation) e.stopPropagation();
-    var f = $('todoForm'); f.hidden = !f.hidden;
-    if (!f.hidden) { $('todoDate').value = S.today; $('todoText').value = ''; $('todoText').focus(); }
-  };
-  $('todoText').onkeydown = function (e) {
-    if (e.key === 'Escape') { $('todoForm').hidden = true; return; }
+  document.addEventListener('click', function (e) {
+    if ($('cellMenu').hidden) return;
+    if (e.target.closest && (e.target.closest('#cellMenu') || e.target.closest('[data-iso]'))) return;
+    closeMenu();
+  });
+  function openTodo() {
+    $('todoMask').hidden = false;
+    $('todoDate').value = S.today; $('todoText').value = '';
+    $('todoText').focus();
+  }
+  function closeTodo() { $('todoMask').hidden = true; }
+  function saveTodo() {
     var text = $('todoText').value.trim();
-    if (e.key !== 'Enter' || !text) return;
+    if (!text) { M.toast('内容不能为空', true); return; }
     var next = (S.workday.todos || []).slice();
     next.push({ id: 't' + Date.now().toString(36), date: $('todoDate').value || S.today, text: text, done: false });
-    $('todoForm').hidden = true;
+    closeTodo();
     saveTodos(next);
+  }
+  $('todoAdd').onclick = function (e) { if (e && e.stopPropagation) e.stopPropagation(); openTodo(); };
+  $('todoSave').onclick = saveTodo;
+  $('todoCancel').onclick = closeTodo;
+  $('todoClose').onclick = closeTodo;
+  $('todoMask').onclick = function (e) { if (e.target === this) closeTodo(); };
+  $('todoText').onkeydown = function (e) {
+    if (e.key === 'Escape') { closeTodo(); return; }
+    if (e.key === 'Enter') saveTodo();
   };
   $('todos').onclick = function (e) {
     if (e.target.dataset && e.target.dataset.donegroup !== undefined) { toggleFold('doneGroup'); renderTodos(); return; }
@@ -567,10 +590,16 @@
       saveTodos(next);
     }
   };
-  $('annAdd').onclick = function (e) {
-    if (e && e.stopPropagation) e.stopPropagation();
-    var f = $('annForm'); f.hidden = !f.hidden; if (!f.hidden) $('annName').focus();
-  };
+  function openAnn() {
+    $('annMask').hidden = false;
+    $('annName').value = ''; $('annDate').value = ''; $('annRepeat').value = '1';
+    $('annName').focus();
+  }
+  function closeAnn() { $('annMask').hidden = true; }
+  $('annAdd').onclick = function (e) { if (e && e.stopPropagation) e.stopPropagation(); openAnn(); };
+  $('annCancel').onclick = closeAnn;
+  $('annClose').onclick = closeAnn;
+  $('annMask').onclick = function (e) { if (e.target === this) closeAnn(); };
   $('annSave').onclick = function () {
     var name = $('annName').value.trim(), date = $('annDate').value.trim();
     if (!name || !date) { M.toast('名称和日期都要填', true); return; }
@@ -581,7 +610,7 @@
     if (mo < 1 || mo > 12 || dd < 1 || dd > 31) { M.toast('日期不合法', true); return; }
     var next = (S.workday.anniversaries || []).slice();
     next.push({ id: 'a' + Date.now().toString(36), name: name, date: date, repeat: $('annRepeat').value === '1' });
-    $('annForm').hidden = true;
+    closeAnn();
     write('set_anniversaries', { anniversaries: next });
   };
   $('anns').onclick = function (e) {
