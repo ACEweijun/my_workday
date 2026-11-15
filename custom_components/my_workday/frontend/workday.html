@@ -343,13 +343,17 @@
     }
     var rows = '';
     d.todos.forEach(function (t) {
-      rows += '<div class="mrow"><span class="mkind">待</span>' +
+      rows += '<div class="mrow"><input type="checkbox" class="menu-check" style="width:auto" data-mtodo-check="' +
+        M.esc(t.id) + '"' + (t.done ? ' checked' : '') + ' title="标记完成">' +
+        '<span class="mkind">待</span>' +
         '<span class="mt' + (t.done ? ' done' : '') + '" data-mtodo-open="' + M.esc(t.id) + '" title="点击编辑">' +
-        M.esc(t.text) + '</span></div>';
+        M.esc(t.text) + '</span>' +
+        '<button class="danger" data-mtodo-del="' + M.esc(t.id) + '">' + delText('todo', t.id) + '</button></div>';
     });
     d.anns.forEach(function (a) {
       rows += '<div class="mrow"><span class="mkind ann">纪</span>' +
-        '<span class="mt" data-mann-open="' + M.esc(a.id) + '" title="点击编辑">' + M.esc(a.name) + '</span></div>';
+        '<span class="mt" data-mann-open="' + M.esc(a.id) + '" title="点击编辑">' + M.esc(a.name) + '</span>' +
+        '<button class="danger" data-mann-del="' + M.esc(a.id) + '">' + delText('ann', a.id) + '</button></div>';
     });
     d.dues.forEach(function (x) {
       rows += '<div class="mrow"><span class="mkind due">维</span><span class="mt">' +
@@ -507,10 +511,29 @@
       else openAnn(null, date);
       return;
     }
+    var del = t.dataset.mtodoDel;
+    if (del) {
+      if (!armDel('todo', del)) { this.innerHTML = menuHtml(); return; }
+      saveTodos((S.workday.todos || []).filter(function (x) { return x.id !== del; })); return;
+    }
+    var adel = t.dataset.mannDel;
+    if (adel) {
+      if (!armDel('ann', adel)) { this.innerHTML = menuHtml(); return; }
+      write('set_anniversaries', { anniversaries: (S.workday.anniversaries || []).filter(function (x) { return x.id !== adel; }) });
+      return;
+    }
     var tid = t.dataset.mtodoOpen;
     if (tid) { closeMenu(); openTodo(tid); return; }
     var aid = t.dataset.mannOpen;
     if (aid) { closeMenu(); openAnn(aid); return; }
+  };
+  $('cellMenu').onchange = function (e) {
+    var id = e.target.dataset && e.target.dataset.mtodoCheck;
+    if (!id || !S) return;
+    var done = !!e.target.checked;
+    saveTodos((S.workday.todos || []).map(function (t) {
+      return t.id === id ? Object.assign({}, t, { done: done }) : t;
+    }));
   };
   document.addEventListener('keydown', function (e) {
     if (e.key === 'Escape' && !$('cellMenu').hidden) closeMenu();

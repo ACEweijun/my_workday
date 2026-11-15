@@ -197,7 +197,8 @@ class TestRepo(unittest.TestCase):
         html = (PKG / 'frontend' / 'maintenance.html').read_text(encoding='utf-8')
         self.assertIn('resetForms()', html)
         self.assertIn('if (target === slug)', html)
-        self.assertIn('kept.indexOf(i.id)', html)
+        self.assertIn('renderRecEntries(', html)
+        self.assertIn("openRecForm(null)", html)
         self.assertNotIn('Number(this.value)', html)
 
     def test_options_flow_constructor(self):
@@ -219,14 +220,16 @@ class TestRepo(unittest.TestCase):
 
     def test_maintenance_legacy_ui(self):
         html = (PKG / 'frontend' / 'maintenance.html').read_text(encoding='utf-8')
-        for token in ('id="projMask"', 'id="itemMask"', 'id="logMask"', 'id="recMask"',
+        for token in ('id="projMask"', 'id="itemMask"', 'id="recMask"',
                       'id="unitBox"', 'syncUnit', 'autoSlug', 'data-item=',
-                      '记录多项维护', 'logtable', 'mt-side',
-                      'counterValue', 'data-lognote'):
+                      '记录多项维护', 'mt-side', 'counterValue',
+                      'data-recheck=', 'renderRecEntries(', 'id="recDelete"'):
             self.assertIn(token, html)
         for gone in ('projStep1', 'projStep2', 'projNext', 'projUnitLabel',
                      'data-baseline=', 'data-logone=', 'data-edit=', 'set_baseline',
-                     'id="projMenu"', 'data-pm=', 'renderMenu('):
+                     'id="projMenu"', 'data-pm=', 'renderMenu(',
+                     'id="logMask"', 'renderLogItems(', 'data-lognote',
+                     'data-history=', 'expanded['):
             self.assertNotIn(gone, html)
 
     def test_layout_css_fixes(self):
@@ -266,7 +269,7 @@ class TestRepo(unittest.TestCase):
     def test_delete_project_confirmation_works(self):
         html = (PKG / 'frontend' / 'maintenance.html').read_text(encoding='utf-8')
         self.assertIn("armDel('project')", html)
-        self.assertIn("$('projDelete').textContent = '确认删除'", html)
+        self.assertIn("$('projDelete').textContent = '确认删除这个项目'", html)
         self.assertIn("write('delete_project', { slug: target })", html)
         self.assertNotIn('var armed = deleteArmed;', html)
 
@@ -347,8 +350,8 @@ class TestRepo(unittest.TestCase):
                       'function openAnn(id, date)', 'function openTodo(id, date)',
                       'function saveAnn()'):
             self.assertIn(token, w)
-        for gone in ('menuInput', 'menu-x', 'data-mclose', 'data-mtodo-done=', 'data-mtodo-del=',
-                     'data-mann-del=', 'data-mtodo-edit=', 'data-mann-edit=',
+        for gone in ('menuInput', 'menu-x', 'data-mclose', 'data-mtodo-done=',
+                     'data-mtodo-edit=', 'data-mann-edit=',
                      'inlineEdit(', 'saveAnns('):
             self.assertNotIn(gone, w)
         m = (PKG / 'frontend' / 'maintenance.html').read_text(encoding='utf-8')
@@ -401,10 +404,12 @@ class TestRepo(unittest.TestCase):
     def test_history_rows_open_record_modal(self):
         m = (PKG / 'frontend' / 'maintenance.html').read_text(encoding='utf-8')
         for token in ("$('history').onclick", 'data-rec=', 'function openRecForm(recordId)',
-                      'id="recEntries"', 'data-renote=', 'data-renotedel=',
-                      'function saveRecForm()', 'rec-row', '点任意一行可编辑'):
+                      'id="recEntries"', 'data-renote=', 'data-recheck=',
+                      'function saveRecForm()', 'rec-row', '一次维护一行',
+                      'function deleteRec()', 'renderRecEntries('):
             self.assertIn(token, m)
-        for gone in ('data-redit=', 'data-rdel=', 'id="recItem"', 'id="recNote"', '整次维护的流水，只读'):
+        for gone in ('data-redit=', 'data-rdel=', 'id="recItem"', 'id="recNote"',
+                     '整次维护的流水，只读', 'data-renotedel=', 'data-history='):
             self.assertNotIn(gone, m)
         css = (PKG / 'frontend' / 'shared.css').read_text(encoding='utf-8')
         self.assertIn('.proj-title:hover', css)
@@ -436,6 +441,31 @@ class TestRepo(unittest.TestCase):
         self.assertIn('id="itemIntervalBox" hidden', m)
         self.assertIn("$('itemIntervalBox').hidden = !p.need_counter", m)
         self.assertIn("p.need_counter && i && i.interval_counter != null", m)
+
+    def test_unified_record_modal_modes(self):
+        m = (PKG / 'frontend' / 'maintenance.html').read_text(encoding='utf-8')
+        for token in ("recTitle').textContent = rec ? '编辑维护记录' : '记录多项维护'",
+                      "M.call('log_service', data)", 'function collectRecForm()',
+                      'function deleteRec()', '本次未记录', '取消勾选即从这次记录中移除'):
+            self.assertIn(token, m)
+        self.assertIn("openRecForm(null)", m)
+        self.assertIn("openRecForm(row.dataset.rec)", m)
+        css = (PKG / 'frontend' / 'shared.css').read_text(encoding='utf-8')
+        self.assertIn('.rec-check', css)
+        self.assertIn('.modal-actions', css)
+
+    def test_delete_labels_are_explicit(self):
+        m = (PKG / 'frontend' / 'maintenance.html').read_text(encoding='utf-8')
+        for token in ('删除这个项目', '删除这个小项', '删除这次记录'):
+            self.assertIn(token, m)
+
+    def test_menu_todo_checkbox_and_delete(self):
+        w = (PKG / 'frontend' / 'workday.html').read_text(encoding='utf-8')
+        for token in ('data-mtodo-check=', 'data-mtodo-del=', 'data-mann-del=',
+                      "$('cellMenu').onchange", 'menu-check', 'saveTodos('):
+            self.assertIn(token, w)
+        self.assertIn('.menu .mrow input[type=checkbox]',
+                      (PKG / 'frontend' / 'shared.css').read_text(encoding='utf-8'))
 
     def test_frontend_routing_and_ws_snapshot(self):
         init = (PKG / '__init__.py').read_text(encoding='utf-8')
