@@ -482,12 +482,12 @@ class TestRepo(unittest.TestCase):
         css = (PKG / 'frontend' / 'shared.css').read_text(encoding='utf-8')
         self.assertIn('.rec-name', css)
 
-    def test_date_picker_no_self_showpicker(self):
+    def test_date_picker_whole_row_clickable(self):
         for f in ('workday.html', 'maintenance.html'):
             html = (PKG / 'frontend' / f).read_text(encoding='utf-8')
-            # 输入框自身 click 不再调 showPicker（改由原生处理），只保留整行点击
+            # 点输入框本身 / 标签 / 整行都触发 showPicker（去掉 input 跳过判断）
             self.assertNotIn("el.addEventListener('click', open)", html)
-            self.assertIn('if (e.target === el) return;', html)
+            self.assertNotIn('if (e.target === el) return;', html)
             self.assertIn('if (typeof el.showPicker ===', html)
 
     def test_workday_stat_labels_simplified(self):
@@ -537,16 +537,33 @@ class TestRepo(unittest.TestCase):
             self.assertNotIn(gone, m)
         self.assertIn('function renderCounter()', m)
 
-    def test_two_action_buttons_side_by_side(self):
+    def test_action_buttons_moved_to_items_head(self):
         m = (PKG / 'frontend' / 'maintenance.html').read_text(encoding='utf-8')
-        head = m[m.index('class="card-head proj-head'):m.index('</div>', m.index('class="card-head proj-head'))]
-        self.assertIn('id="logOpen"', head)
-        self.assertIn('id="itemAdd"', head)
+        self.assertNotIn('id="logOpen"', m)
         self.assertEqual(m.count('id="itemAdd"'), 1)
-        self.assertIn('action-row', m)
-        self.assertIn('.action-row button{flex:1',
-                      (PKG / 'frontend' / 'shared.css').read_text(encoding='utf-8'))
-        self.assertNotIn('<h2>维护小项</h2><span class="spacer"></span>\n        <button', m)
+        self.assertIn('id="itemsHead"', m)
+        self.assertIn('class="card-head items-head" id="itemsHead"', m)
+        self.assertIn("$('itemsHead').onclick", m)
+        self.assertIn("closest('#itemAdd')", m)
+        self.assertIn('openRecForm(null)', m)
+
+    def test_history_collapsed_by_default(self):
+        m = (PKG / 'frontend' / 'maintenance.html').read_text(encoding='utf-8')
+        self.assertIn('id="histHead"', m)
+        self.assertIn('id="histBody" hidden', m)
+        self.assertIn('id="histArrow"', m)
+        self.assertIn('$(\'histHead\').onclick', m)
+        self.assertIn('histOpen = !histOpen', m)
+        self.assertIn("histOpen ? '▾' : '▸'", m)
+
+    def test_date_field_picker_indicator(self):
+        for f in ('workday.html', 'maintenance.html'):
+            h = (PKG / 'frontend' / f).read_text(encoding='utf-8')
+            self.assertNotIn('if (e.target === el) return;', h)
+            self.assertIn('el.showPicker()', h)
+        css = (PKG / 'frontend' / 'shared.css').read_text(encoding='utf-8')
+        self.assertIn('::-webkit-calendar-picker-indicator', css)
+        self.assertIn('width:100%;height:100%', css)
 
     def test_item_own_records_clickable(self):
         m = (PKG / 'frontend' / 'maintenance.html').read_text(encoding='utf-8')

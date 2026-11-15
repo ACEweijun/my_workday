@@ -184,6 +184,11 @@ textarea{font-size:var(--fs-sm)}
 .item-title:hover{background:var(--soft)}
 .item-title b[data-itemname]{cursor:pointer}
 .item-title b[data-itemname]:hover{text-decoration:underline dotted}
+.fold-head{cursor:pointer;user-select:none}
+.fold-head:hover h2{color:var(--accent)}
+.fold-arrow{color:var(--muted);font-size:13px;margin-left:4px}
+.items-head{cursor:pointer}
+.items-head .mini{font-size:12px;min-height:30px;padding:4px 8px}
 .proj-head{flex-wrap:wrap;row-gap:8px}
 .menu .mrow{font-size:13px}
 @media (max-width:620px){
@@ -297,6 +302,8 @@ textarea{font-size:var(--fs-sm)}
 .date-field{cursor:pointer}
 .date-field label{cursor:pointer}
 .date-field:hover input[type=date]{border-color:var(--accent)}
+.date-field input[type=date]{position:relative}
+.date-field input[type=date]::-webkit-calendar-picker-indicator{position:absolute;left:0;top:0;width:100%;height:100%;margin:0;padding:0;opacity:0;cursor:pointer;z-index:2}
 input[type=date]{cursor:pointer}
 input[type=checkbox]{width:22px;height:22px;min-height:22px;padding:0;margin:0;flex:none;accent-color:var(--accent);cursor:pointer;vertical-align:middle}
 .menu .mrow,.row{min-height:44px}

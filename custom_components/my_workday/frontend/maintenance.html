@@ -13,9 +13,6 @@
   <aside class="mt-side" id="projSide"></aside>
   <div class="mt-main">
     <section class="card">
-      <div class="card-head proj-head action-row">
-        <button class="primary" id="logOpen">记录多项维护</button>
-        <button class="primary" id="itemAdd">+ 新增小项</button></div>
       <div class="form" id="counterBox" hidden>
         <div><label id="counterLabel">当前计数</label><input type="number" id="counterValue"></div>
       </div>
@@ -23,14 +20,18 @@
     </section>
 
     <section class="card">
-      <div class="card-head"><h2>维护小项</h2></div>
+      <div class="card-head items-head" id="itemsHead" title="点右侧空白处记录多项维护">
+        <h2>维护小项</h2><span class="spacer"></span>
+        <button class="ghost mini" id="itemAdd" title="新增维护小项">+ 新增小项</button></div>
       <div id="items"></div>
     </section>
 
     <section class="card">
-      <div class="card-head"><h2>历史记录</h2><span class="spacer"></span><span class="hint" id="historyCount"></span></div>
-      <div class="hint" style="margin-bottom:6px">一次维护一行，点开可改日期、计数、勾选的小项与逐项备注。</div>
-      <div id="history"></div>
+      <div class="card-head fold-head" id="histHead" title="点击展开/收起历史记录"><h2>历史记录</h2><span class="spacer"></span><span class="hint" id="historyCount"></span><span class="fold-arrow" id="histArrow">▸</span></div>
+      <div id="histBody" hidden>
+        <div class="hint" style="margin-bottom:6px">一次维护一行，点开可改日期、计数、勾选的小项与逐项备注。</div>
+        <div id="history"></div>
+      </div>
     </section>
   </div>
 </main>
@@ -94,7 +95,7 @@
 (function () {
   'use strict';
   var M = window.MW, $ = M.$, S = null, busy = false, slug = null, retries = 0;
-  var editingSlug = null, lastCount = null, pendingDel = null, itemOpen = {};
+  var editingSlug = null, lastCount = null, pendingDel = null, itemOpen = {}, histOpen = false;
   var MASKS = ['projMask', 'itemMask', 'recMask'];
 
   function armDel(k) {
@@ -468,7 +469,10 @@
     if (raw === '' || !isFinite(Number(raw))) { M.toast('请填写有效的计数值', true); return; }
     write('set_counter', { slug: p.slug, value: Number(raw) });
   };
-  $('logOpen').onclick = function () { openRecForm(null); };
+  $('itemsHead').onclick = function (e) {
+    if (e.target && e.target.closest && e.target.closest('#itemAdd')) return;
+    openRecForm(null);
+  };
   $('itemAdd').onclick = function () { openItemForm(null); };
   $('itemCancel').onclick = function () { $('itemMask').hidden = true; };
   $('itemClose').onclick = function () { $('itemMask').hidden = true; };
@@ -498,6 +502,11 @@
       else { openRecForm(null, title.dataset.item); }
       return;
     }
+  };
+  $('histHead').onclick = function () {
+    histOpen = !histOpen;
+    $('histBody').hidden = !histOpen;
+    $('histArrow').textContent = histOpen ? '▾' : '▸';
   };
   $('history').onclick = function (e) {
     var row = e.target.closest && e.target.closest('[data-rec]');
@@ -532,11 +541,9 @@
         var lab = row.querySelector && row.querySelector('label');
         if (lab && el.id && !lab.htmlFor) lab.htmlFor = el.id;
       }
-      // 直接点输入框交给浏览器原生日历；只有点标签/整行空白处才用
-      // showPicker() 打开，避免输入框自身 click 里调用 showPicker 与原生
-      // 行为冲突导致日历打不开。
+      // 点输入框本身、标签、整行空白处都会尝试 showPicker()；CSS 里还把
+      // 原生日历图标铺满整个输入框，双保险确保点日期任意位置都能弹出日历。
       if (row) row.addEventListener('click', function (e) {
-        if (e.target === el) return;
         if (el.disabled || el.readOnly) return;
         var now = Date.now();
         if (now - last < 250) return;
