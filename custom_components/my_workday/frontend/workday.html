@@ -358,7 +358,7 @@
     var h = '<div class="menu-add"><button class="primary" data-madd>+ 新增</button></div>';
     var rows = '';
     d.todos.forEach(function (t) {
-      rows += '<div class="mrow"><input type="checkbox" class="menu-check" style="width:auto" data-mtodo-check="' +
+      rows += '<div class="mrow"><input type="checkbox" class="menu-check" data-mtodo-check="' +
         M.esc(t.id) + '"' + (t.done ? ' checked' : '') + ' title="标记完成">' +
         '<span class="mkind">待</span>' +
         '<span class="mt' + (t.done ? ' done' : '') + '" data-mtodo-open="' + M.esc(t.id) + '" title="点击编辑">' +
@@ -431,7 +431,7 @@
   function todoRow(t) {
     return '<div class="row' + (t.done ? ' done' : '') + '">' +
       '<span class="sub todo-when">' + todoWhen(t) + '</span>' +
-      '<input type="checkbox" style="width:auto" data-todo-check="' + M.esc(t.id) + '"' + (t.done ? ' checked' : '') + '>' +
+      '<input type="checkbox" data-todo-check="' + M.esc(t.id) + '"' + (t.done ? ' checked' : '') + '>' +
       '<span class="txt todo-text" data-todo-edit="' + M.esc(t.id) + '" title="点击编辑">' + M.esc(t.text) + '</span>' +
       '<button class="ghost danger" data-todo-del="' + M.esc(t.id) + '">' + delText('todo', t.id) + '</button></div>';
   }
@@ -797,6 +797,32 @@
   M.onUpdate(load);
   M.start();
   load();
+  function bindDateFields() {
+    var list = document.querySelectorAll('input[type=date]');
+    Array.prototype.forEach.call(list, function (el) {
+      var row = el.parentNode, last = 0;
+      if (row && row.classList) {
+        row.classList.add('date-field');
+        var lab = row.querySelector && row.querySelector('label');
+        if (lab && el.id && !lab.htmlFor) lab.htmlFor = el.id;
+      }
+      function open() {
+        var now = Date.now();
+        if (now - last < 250) return;
+        last = now;
+        if (el.disabled || el.readOnly) return;
+        try {
+          if (typeof el.showPicker === 'function') el.showPicker();
+          else el.focus();
+        } catch (err) { el.focus(); }
+      }
+      el.addEventListener('click', open);
+      if (row) row.addEventListener('click', function (e) {
+        if (e.target !== el) open();
+      });
+    });
+  }
+  bindDateFields();
 })();
 </script>
 </body>

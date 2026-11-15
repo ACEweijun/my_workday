@@ -201,6 +201,16 @@ class TestRepo(unittest.TestCase):
         self.assertIn("openRecForm(null)", html)
         self.assertNotIn('Number(this.value)', html)
 
+    def test_item_name_vs_blank_click(self):
+        html = (PKG / 'frontend' / 'maintenance.html').read_text(encoding='utf-8')
+        # 点名称=编辑小项；点行空白=给该小项记一次新维护
+        self.assertIn('data-itemname', html)
+        self.assertIn("var nm = t.closest && t.closest('[data-itemname]')", html)
+        self.assertIn("openItemForm(title.dataset.item)", html)
+        self.assertIn("openRecForm(null, title.dataset.item)", html)
+        # 聚焦单小项时标题不再叫“记录多项维护”
+        self.assertIn('记录维护 · ', html)
+
     def test_options_flow_constructor(self):
         src = (PKG / 'config_flow.py').read_text(encoding='utf-8')
         self.assertIn('return MyWorkdayOptionsFlow()', src)
@@ -451,8 +461,8 @@ class TestRepo(unittest.TestCase):
 
     def test_unified_record_modal_modes(self):
         m = (PKG / 'frontend' / 'maintenance.html').read_text(encoding='utf-8')
-        for token in ("recTitle').textContent = !rec ? '记录多项维护' : (focusItem ? '编辑这条维护记录' : '编辑维护记录')",
-                      "M.call('log_service', data)", 'function collectRecForm()',
+        for token in ("var fItem = focusItem ? (p.items || []).filter(function (x) { return x.id === focusItem; })[0] : null;",
+                      "记录维护 · ", "M.call('log_service', data)", 'function collectRecForm()',
                       'function deleteRec()', '本次未记录', '取消勾选即从这次记录中移除'):
             self.assertIn(token, m)
         self.assertIn("openRecForm(null)", m)

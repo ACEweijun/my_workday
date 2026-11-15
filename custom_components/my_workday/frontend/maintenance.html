@@ -207,8 +207,9 @@
           (r.counter != null ? ' · ' + M.esc(r.counter) : '') + '</span><span class="txt">' +
           M.esc(e.note || '') + '</span></div>';
       }).join('') + (recs.length > 5 ? '<div class="hint">还有 ' + (recs.length - 5) + ' 条</div>' : '') : '';
-      return '<div class="mt-item"><div class="top item-title" data-item="' + M.esc(i.id) + '" title="点击编辑">' +
-        '<b>' + M.esc(i.name) + '</b>' +
+      return '<div class="mt-item"><div class="top item-title" data-item="' + M.esc(i.id) +
+        '" title="点名称编辑小项 · 点空白处给它记一次新维护">' +
+        '<b data-itemname title="点击编辑小项">' + M.esc(i.name) + '</b>' +
         (i.note ? '<span class="item-note">' + M.esc(i.note) + '</span>' : '') +
         pill(st.status) + '</div>' +
         meta +
@@ -249,7 +250,7 @@
       var enabled = !rec || has;
       var checked = rec ? has : false;
       return '<div class="rec-ent' + (enabled ? '' : ' off') + '" data-renoterow="' + M.esc(i.id) + '">' +
-        '<label class="rec-check"><input type="checkbox" style="width:auto" data-recheck="' + M.esc(i.id) + '"' +
+        '<label class="rec-check"><input type="checkbox" data-recheck="' + M.esc(i.id) + '"' +
         (checked ? ' checked' : '') + (enabled ? '' : ' disabled') + '><span>' + M.esc(i.name) + '</span></label>' +
         '<input type="text" data-renote="' + M.esc(i.id) + '" value="' + M.esc(inRec[i.id] || '') +
         '" placeholder="备注"' + (checked ? '' : ' disabled') + '>' +
@@ -344,9 +345,12 @@
     $('recMask').hidden = false;
     $('recId').value = recordId || '';
     $('recFocus').value = focusItem || '';
-    $('recTitle').textContent = !rec ? '记录多项维护' : (focusItem ? '编辑这条维护记录' : '编辑维护记录');
+    var fItem = focusItem ? (p.items || []).filter(function (x) { return x.id === focusItem; })[0] : null;
+    $('recTitle').textContent = !rec ? (focusItem ? '记录维护 · ' + (fItem ? fItem.name : '') : '记录多项维护')
+      : (focusItem ? '编辑这条维护记录' : '编辑维护记录');
     $('recHint').textContent = !rec
-      ? '勾哪行就记哪行，每行可写自己的备注；填了计数会同步更新当前计数。'
+      ? (focusItem ? '给「' + (fItem ? fItem.name : '') + '」记一次维护；日期和计数会更新它的状态。'
+                   : '勾哪行就记哪行，每行可写自己的备注；填了计数会同步更新当前计数。')
       : (focusItem ? '只编辑这个小项在这次维护里的记录；取消勾选即移除这条记录。'
                    : '取消勾选即从这次记录中移除该小项；要补记其它小项请用「记录多项维护」。');
     $('recDate').value = rec ? (rec.date || S.today) : S.today;
@@ -478,7 +482,12 @@
     var own = t.closest && t.closest('[data-recitem]');
     if (own) { openRecForm(own.dataset.rec, own.dataset.recitem); return; }
     var title = t.closest && t.closest('[data-item]');
-    if (title) { openItemForm(title.dataset.item); return; }
+    if (title) {
+      var nm = t.closest && t.closest('[data-itemname]');
+      if (nm) { openItemForm(title.dataset.item); }
+      else { openRecForm(null, title.dataset.item); }
+      return;
+    }
   };
   $('history').onclick = function (e) {
     var row = e.target.closest && e.target.closest('[data-rec]');
@@ -504,6 +513,32 @@
   M.onUpdate(load);
   M.start();
   load();
+  function bindDateFields() {
+    var list = document.querySelectorAll('input[type=date]');
+    Array.prototype.forEach.call(list, function (el) {
+      var row = el.parentNode, last = 0;
+      if (row && row.classList) {
+        row.classList.add('date-field');
+        var lab = row.querySelector && row.querySelector('label');
+        if (lab && el.id && !lab.htmlFor) lab.htmlFor = el.id;
+      }
+      function open() {
+        var now = Date.now();
+        if (now - last < 250) return;
+        last = now;
+        if (el.disabled || el.readOnly) return;
+        try {
+          if (typeof el.showPicker === 'function') el.showPicker();
+          else el.focus();
+        } catch (err) { el.focus(); }
+      }
+      el.addEventListener('click', open);
+      if (row) row.addEventListener('click', function (e) {
+        if (e.target !== el) open();
+      });
+    });
+  }
+  bindDateFields();
 })();
 </script>
 </body>
