@@ -88,7 +88,7 @@
 (function () {
   'use strict';
   var M = window.MW, $ = M.$, S = null, busy = false, year, month, retries = 0;
-  var menuDate = null, menuType = null, menuAdding = false, selectedCell = null, suppressClick = false, touchTimer = null, touchXY = null;
+  var menuDate = null, menuAdding = false, selectedCell = null, suppressClick = false, touchTimer = null, touchXY = null;
   var pendingDel = null, customDirty = false;
   var FOLD_KEY = 'my_workday_fold2', fold = {};
   try { fold = JSON.parse(localStorage.getItem(FOLD_KEY) || '{}') || {}; } catch (e) { fold = {}; }
@@ -290,30 +290,22 @@
   function menuHtml() {
     if (!menuDate || !S) return '';
     var d = cellData(menuDate);
-    var h = '';
-    h += '<div class="menu-add"><button class="primary" data-madd>' +
+    var h = '<button class="ghost menu-x" data-mclose aria-label="关闭">×</button>' +
+      '<div class="menu-add"><button class="primary" data-madd>' +
       (menuAdding ? '收起新增' : '+ 新增') + '</button></div>';
     if (menuAdding) {
-      h += '<div class="types"><button data-mtype="todo" class="' + (menuType === 'todo' ? 'on' : '') + '">待办</button>' +
-        '<button data-mtype="ann" class="' + (menuType === 'ann' ? 'on' : '') + '">纪念日</button></div>';
-      if (menuType === 'todo') {
-        h += '<input id="menuInput" placeholder="要做什么，回车保存"><div class="hint">回车保存 · Esc 关闭</div>';
-      } else if (menuType === 'ann') {
-        h += '<input id="menuInput" placeholder="名称，如 生日">' +
-          '<label class="hint" style="display:block;margin-top:6px"><input type="checkbox" id="menuRepeat" style="width:auto" checked> 每年重复（只记月日）</label>';
-      }
+      h += '<div class="types"><button data-mtype="todo">新增待办</button>' +
+        '<button data-mtype="ann">新增纪念日</button></div>';
     }
     var rows = '';
     d.todos.forEach(function (t) {
       rows += '<div class="mrow"><span class="mkind">待</span>' +
-        '<span class="mt' + (t.done ? ' done' : '') + '" data-mtodo-edit="' + M.esc(t.id) + '" title="点击改文字">' + M.esc(t.text) + '</span>' +
-        '<button data-mtodo-done="' + M.esc(t.id) + '">' + (t.done ? '恢复' : '完成') + '</button>' +
-        '<button class="danger" data-mtodo-del="' + M.esc(t.id) + '">' + delText('todo', t.id) + '</button></div>';
+        '<span class="mt' + (t.done ? ' done' : '') + '" data-mtodo-open="' + M.esc(t.id) + '" title="点击编辑">' +
+        M.esc(t.text) + '</span></div>';
     });
     d.anns.forEach(function (a) {
       rows += '<div class="mrow"><span class="mkind ann">纪</span>' +
-        '<span class="mt" data-mann-edit="' + M.esc(a.id) + '" title="点击改名称">' + M.esc(a.name) + '</span>' +
-        '<button class="danger" data-mann-del="' + M.esc(a.id) + '">' + delText('ann', a.id) + '</button></div>';
+        '<span class="mt" data-mann-open="' + M.esc(a.id) + '" title="点击编辑">' + M.esc(a.name) + '</span></div>';
     });
     d.dues.forEach(function (x) {
       rows += '<div class="mrow"><span class="mkind due">维</span><span class="mt">' +
@@ -324,7 +316,7 @@
   }
   function openMenu(key, x, y) {
     if (!S) return;
-    menuDate = key; menuType = null; menuAdding = false; pendingDel = null;
+    menuDate = key; menuAdding = false;
     var el = $('cellMenu');
     el.hidden = false;
     el.innerHTML = menuHtml();
@@ -334,29 +326,7 @@
   }
   function closeMenu() {
     $('cellMenu').hidden = true;
-    menuDate = null; menuType = null; menuAdding = false; pendingDel = null;
-  }
-  function saveAnns(next) { return write('set_anniversaries', { anniversaries: next }); }
-  function inlineEdit(row, id, oldText, kind) {
-    row.innerHTML = '<input class="mini" value="' + M.esc(oldText) + '">';
-    var inp = row.querySelector('input');
-    if (!inp) return;
-    inp.focus();
-    inp.onkeydown = function (ev) {
-      if (ev.key === 'Escape') { $('cellMenu').innerHTML = menuHtml(); return; }
-      if (ev.key !== 'Enter' || !this.value.trim()) return;
-      var v = this.value.trim();
-      if (kind === 'todo') {
-        saveTodos((S.workday.todos || []).map(function (t) {
-          return t.id === id ? Object.assign({}, t, { text: v }) : t;
-        }));
-      } else {
-        saveAnns((S.workday.anniversaries || []).map(function (a) {
-          return a.id === id ? Object.assign({}, a, { name: v }) : a;
-        }));
-      }
-      $('cellMenu').innerHTML = menuHtml();
-    };
+    menuDate = null; menuAdding = false;
   }
   function todoWhen(t) {
     var d = M.dayDiff(t.date, S.today);
@@ -390,7 +360,7 @@
     $('annSummary').textContent = (S.workday.anniversaries || []).length + ' 个';
     var list = (S.workday.anniversaries || []).slice().sort(function (a, b) { return a.date.localeCompare(b.date); });
     $('anns').innerHTML = list.length ? list.map(function (a) {
-      return '<div class="row"><span class="txt">' + M.esc(a.name) + '</span>' +
+      return '<div class="row"><span class="txt ann-text" data-ann-edit="' + M.esc(a.id) + '" title="点击编辑">' + M.esc(a.name) + '</span>' +
         '<span class="sub">' + M.esc(a.date) + (a.repeat ? ' · 每年' : '') + '</span>' +
         '<button class="ghost danger" data-ann-del="' + M.esc(a.id) + '">' + delText('ann', a.id) + '</button></div>';
     }).join('') : '<div class="hint">还没有纪念日。</div>';
@@ -478,63 +448,25 @@
     if (touchTimer) { clearTimeout(touchTimer); touchTimer = null; }
   });
   $('cellMenu').onclick = function (e) {
-    var t = e.target, key = menuDate;
+    var t = e.target;
+    if (t.dataset.mclose !== undefined) { closeMenu(); return; }
     if (t.dataset.madd !== undefined) {
       menuAdding = !menuAdding;
-      if (!menuAdding) menuType = null;
       this.innerHTML = menuHtml();
       return;
     }
     var mt = t.dataset.mtype;
     if (mt) {
-      menuType = menuType === mt ? null : mt;
-      this.innerHTML = menuHtml();
-      var focus = $('menuInput'); if (focus) focus.focus();
+      var date = menuDate;
+      closeMenu();
+      if (mt === 'todo') openTodo(null, date);
+      else openAnn(null, date);
       return;
     }
-    var md = t.dataset.mday;
-    if (md) { closeMenu(); write('set_day', { date: key, mode: md }); return; }
-    var done = t.dataset.mtodoDone;
-    if (done) {
-      saveTodos((S.workday.todos || []).map(function (x) {
-        return x.id === done ? Object.assign({}, x, { done: !x.done }) : x;
-      }));
-      return;
-    }
-    var del = t.dataset.mtodoDel;
-    if (del) {
-      if (!armDel('todo', del)) { this.innerHTML = menuHtml(); return; }
-      saveTodos((S.workday.todos || []).filter(function (x) { return x.id !== del; })); return;
-    }
-    var adel = t.dataset.mannDel;
-    if (adel) {
-      if (!armDel('ann', adel)) { this.innerHTML = menuHtml(); return; }
-      saveAnns((S.workday.anniversaries || []).filter(function (x) { return x.id !== adel; })); return;
-    }
-    var edit = t.dataset.mtodoEdit;
-    if (edit) { inlineEdit(t.parentNode, edit, t.textContent, 'todo'); return; }
-    var aedit = t.dataset.mannEdit;
-    if (aedit) { inlineEdit(t.parentNode, aedit, t.textContent, 'ann'); return; }
-  };
-  $('cellMenu').onkeydown = function (e) {
-    if (e.key === 'Escape') { closeMenu(); return; }
-    if (e.key !== 'Enter') return;
-    var inp = $('menuInput');
-    if (!inp || !inp.value.trim()) { if (!menuType) M.toast('先选类型', true); return; }
-    var text = inp.value.trim(), key = menuDate;
-    if (menuType === 'todo') {
-      var next = (S.workday.todos || []).slice();
-      next.push({ id: 't' + Date.now().toString(36), date: key, text: text, done: false });
-      saveTodos(next);
-    } else {
-      var rep = $('menuRepeat') ? $('menuRepeat').checked : true;
-      var list = (S.workday.anniversaries || []).slice();
-      list.push({ id: 'a' + Date.now().toString(36), name: text,
-                  date: rep ? key.slice(5) : key, repeat: rep });
-      saveAnns(list);
-    }
-    inp.value = '';
-    $('cellMenu').innerHTML = menuHtml();
+    var tid = t.dataset.mtodoOpen;
+    if (tid) { closeMenu(); openTodo(tid); return; }
+    var aid = t.dataset.mannOpen;
+    if (aid) { closeMenu(); openAnn(aid); return; }
   };
   document.addEventListener('keydown', function (e) {
     if (e.key === 'Escape' && !$('cellMenu').hidden) closeMenu();
@@ -546,13 +478,13 @@
     if (e.target.closest && (e.target.closest('#cellMenu') || e.target.closest('[data-iso]'))) return;
     closeMenu();
   });
-  var editingTodo = null;
-  function openTodo(id) {
+  var editingTodo = null, editingAnn = null;
+  function openTodo(id, date) {
     editingTodo = id || null;
     $('todoMask').hidden = false;
     $('todoTitle').textContent = id ? '编辑待办' : '新增待办';
     var t = id ? (S.workday.todos || []).filter(function (x) { return x.id === id; })[0] : null;
-    $('todoDate').value = t ? t.date : S.today;
+    $('todoDate').value = t ? t.date : (date || S.today);
     $('todoText').value = t ? t.text : '';
     $('todoText').focus();
   }
@@ -598,17 +530,18 @@
       saveTodos(next);
     }
   };
-  function openAnn() {
+  function openAnn(id, date) {
+    editingAnn = id || null;
     $('annMask').hidden = false;
-    $('annName').value = ''; $('annDate').value = ''; $('annRepeat').value = '1';
+    $('annTitle').textContent = id ? '编辑纪念日' : '新增纪念日';
+    var a = id ? (S.workday.anniversaries || []).filter(function (x) { return x.id === id; })[0] : null;
+    $('annName').value = a ? a.name : '';
+    $('annDate').value = a ? a.date : (date ? date.slice(5) : '');
+    $('annRepeat').value = a ? (a.repeat ? '1' : '0') : '1';
     $('annName').focus();
   }
-  function closeAnn() { $('annMask').hidden = true; }
-  $('annAdd').onclick = function (e) { if (e && e.stopPropagation) e.stopPropagation(); openAnn(); };
-  $('annCancel').onclick = closeAnn;
-  $('annClose').onclick = closeAnn;
-  $('annMask').onclick = function (e) { if (e.target === this) closeAnn(); };
-  $('annSave').onclick = function () {
+  function closeAnn() { $('annMask').hidden = true; editingAnn = null; }
+  function saveAnn() {
     var name = $('annName').value.trim(), date = $('annDate').value.trim();
     if (!name || !date) { M.toast('名称和日期都要填', true); return; }
     if (!/^\d{2}-\d{2}$/.test(date) && !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
@@ -616,12 +549,27 @@
     }
     var mo = Number(date.slice(-5, -3)), dd = Number(date.slice(-2));
     if (mo < 1 || mo > 12 || dd < 1 || dd > 31) { M.toast('日期不合法', true); return; }
+    var rep = $('annRepeat').value === '1';
+    if (rep && /^\d{4}-\d{2}-\d{2}$/.test(date)) date = date.slice(5);
     var next = (S.workday.anniversaries || []).slice();
-    next.push({ id: 'a' + Date.now().toString(36), name: name, date: date, repeat: $('annRepeat').value === '1' });
+    if (editingAnn) {
+      next = next.map(function (a) {
+        return a.id === editingAnn ? Object.assign({}, a, { name: name, date: date, repeat: rep }) : a;
+      });
+    } else {
+      next.push({ id: 'a' + Date.now().toString(36), name: name, date: date, repeat: rep });
+    }
     closeAnn();
     write('set_anniversaries', { anniversaries: next });
-  };
+  }
+  $('annAdd').onclick = function (e) { if (e && e.stopPropagation) e.stopPropagation(); openAnn(null); };
+  $('annCancel').onclick = closeAnn;
+  $('annClose').onclick = closeAnn;
+  $('annMask').onclick = function (e) { if (e.target === this) closeAnn(); };
+  $('annSave').onclick = saveAnn;
   $('anns').onclick = function (e) {
+    var edit = e.target.dataset.annEdit;
+    if (edit) { openAnn(edit); return; }
     var id = e.target.dataset.annDel; if (!id) return;
     if (!armDel('ann', id)) { renderAnns(); return; }
     write('set_anniversaries', {

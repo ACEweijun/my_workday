@@ -193,3 +193,11 @@ textarea{font-size:var(--fs-sm)}
 .todo-text{cursor:pointer}
 .todo-text:hover{color:var(--accent);text-decoration:underline}
 @media (max-width:620px){.todo-when{width:68px;font-size:11px}}
+
+.menu-x{position:absolute;top:6px;right:6px;min-height:28px;padding:0 8px;z-index:2}
+.menu .menu-add button{width:calc(100% - 34px)}
+.ann-text{cursor:pointer}
+.ann-text:hover{color:var(--accent);text-decoration:underline}
+
+.proj-head button{flex:none}
+@media (max-width:620px){.proj-head{gap:6px}.proj-head .spacer{flex-basis:100%;height:0}}

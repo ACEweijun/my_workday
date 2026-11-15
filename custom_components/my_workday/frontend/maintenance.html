@@ -15,6 +15,7 @@
     <section class="card">
       <div class="card-head proj-head"><h2 id="projectHead">维护项目</h2><span class="spacer"></span>
         <span class="hint" id="projectType"></span>
+        <button class="ghost" id="projEdit">编辑项目</button>
         <button class="primary" id="logOpen">记录多项维护</button></div>
       <div class="stats" id="overview"></div>
       <div class="form" id="counterBox" hidden>
@@ -77,7 +78,7 @@
     <div class="modal-body">
       <div><label>维护日期</label><input type="date" id="logDate"></div>
       <div id="logCounterBox" hidden><label id="logCounterLabel">当前计数</label><input type="number" id="logCounter"></div>
-      <div><span class="hint">勾哪行就记哪行，每行可写自己的备注。</span></div>
+      <div><span class="hint">勾哪行就记哪行，每行可写自己的备注；填了计数会同步更新当前计数。</span></div>
       <div id="logItems"></div>
       <div class="full"><button class="primary" id="logSave">保存这次维护</button>
         <button class="ghost" id="logCancel">取消</button></div>
@@ -270,9 +271,7 @@
     el.hidden = false;
     el.innerHTML = '<h3><button class="ghost" data-pmclose style="float:right;padding:1px 7px">×</button>项目操作</h3>' +
       '<div class="modes" style="flex-direction:column;align-items:stretch">' +
-      '<button data-pm="edit">编辑项目</button>' +
-      '<button data-pm="log">记录多项维护</button>' +
-      '<button data-pm="json">导出 JSON 备份</button>' +
+      '<button data-pm="json">导出当前项目 JSON</button>' +
       '<button data-pm="md">导出 Markdown</button>' +
       '<button data-pm="refresh">刷新数据</button>' +
       '<button class="danger" data-pm="del">' + (deleteArmed ? '确认删除（不可撤销）' : '删除项目') + '</button></div>';
@@ -364,9 +363,7 @@
     if (add) { openForm(false); return; }
     var t = e.target.closest && e.target.closest('[data-tab]'); if (!t) return;
     var target = t.dataset.tab;
-    if (target === slug) {
-      menuSlug = target; touchXY = { x: e.clientX || 20, y: e.clientY || 20 }; renderMenu(); return;
-    }
+    if (target === slug) return;
     slug = target; expanded = {}; lastCount = null; resetForms(); render();
   };
   $('projSide').addEventListener('contextmenu', function (e) {
@@ -392,8 +389,6 @@
     var target = menuSlug || slug;
     var armed = deleteArmed;
     closeMenu();
-    if (act === 'edit') { slug = target; openForm(true); return; }
-    if (act === 'log') { slug = target; render(); openLogForm(); return; }
     if (act === 'refresh') { load(); return; }
     if (act === 'json' || act === 'md') {
       var p = (S.maintenance.projects || []).filter(function (x) { return x.slug === target; })[0];
@@ -409,6 +404,10 @@
       slug = null; lastCount = null;
       write('delete_project', { slug: target });
     }
+  };
+  $('projEdit').onclick = function () {
+    if (!project()) { M.toast('先新建一个项目', true); return; }
+    openForm(true);
   };
   $('projCounter').onchange = syncUnit;
   $('projSave').onclick = submitProject;

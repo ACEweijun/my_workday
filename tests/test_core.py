@@ -254,8 +254,8 @@ class TestRepo(unittest.TestCase):
         html = (PKG / 'frontend' / 'workday.html').read_text(encoding='utf-8')
         for token in ('function dayLabel(', 'function baseWork(', 'function customMode('):
             self.assertIn(token, html)
-        for gone in ('data-mclose', 'data-mday=', '算上班</button>',
-                     '算休息</button>', '恢复安排</button>'):
+        for gone in ('data-mday=', '算上班</button>',
+                     '算休息</button>', '恢复安排</button>', 'function inlineEdit('):
             self.assertNotIn(gone, html)
         css = (PKG / 'frontend' / 'shared.css').read_text(encoding='utf-8')
         self.assertIn('.stat .sub2', css)
@@ -318,7 +318,7 @@ class TestRepo(unittest.TestCase):
     def test_workday_add_modals(self):
         html = (PKG / 'frontend' / 'workday.html').read_text(encoding='utf-8')
         for token in ('id="todoMask"', 'id="annMask"', 'function openTodo(',
-                      'function openAnn()', 'id="todoSave"', 'id="annSave"',
+                      'function openAnn(', 'id="todoSave"', 'id="annSave"',
                       'closeTodo()', 'closeAnn()'):
             self.assertIn(token, html)
         self.assertNotIn('id="todoForm"', html)
@@ -332,12 +332,28 @@ class TestRepo(unittest.TestCase):
     def test_todo_list_flat_sorted_and_click_to_edit(self):
         html = (PKG / 'frontend' / 'workday.html').read_text(encoding='utf-8')
         for token in ('function todoWhen(', 'function todoRow(', 'class="sub todo-when"',
-                      'data-todo-edit=', 'function openTodo(id)', 'editingTodo',
+                      'data-todo-edit=', 'function openTodo(', 'editingTodo',
                       'data-donegroup'):
             self.assertIn(token, html)
         self.assertNotIn("groups = [['逾期'", html)
         self.assertNotIn("'未来 7 天'", html)
         self.assertIn('.todo-when', (PKG / 'frontend' / 'shared.css').read_text(encoding='utf-8'))
+
+    def test_unified_edit_paths(self):
+        w = (PKG / 'frontend' / 'workday.html').read_text(encoding='utf-8')
+        for token in ('data-mtodo-open=', 'data-mann-open=', 'data-ann-edit=',
+                      'function openAnn(id, date)', 'function openTodo(id, date)',
+                      'menu-x', 'function saveAnn()'):
+            self.assertIn(token, w)
+        for gone in ('menuInput', 'data-mtodo-done=', 'data-mtodo-del=',
+                     'data-mann-del=', 'data-mtodo-edit=', 'data-mann-edit=',
+                     'inlineEdit(', 'saveAnns('):
+            self.assertNotIn(gone, w)
+        m = (PKG / 'frontend' / 'maintenance.html').read_text(encoding='utf-8')
+        self.assertIn('id="projEdit"', m)
+        self.assertIn('导出当前项目 JSON', m)
+        for gone in ('data-pm="edit"', 'data-pm="log"', '导出 JSON 备份'):
+            self.assertNotIn(gone, m)
 
     def test_frontend_routing_and_ws_snapshot(self):
         init = (PKG / '__init__.py').read_text(encoding='utf-8')
