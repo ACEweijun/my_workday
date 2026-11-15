@@ -346,3 +346,8 @@ input[type=checkbox]{width:22px;height:22px;min-height:22px;padding:0;margin:0;f
 .todo-text:hover,.menu .mt[data-mtodo-open]:hover{color:var(--c-todo)}
 .ann-text:hover,.menu .mt[data-mann-open]:hover{color:var(--c-ann)}
 .due-click:hover,.menu .mt[data-mdueslug]:hover{color:var(--c-due)}
+.mt-item .top .item-note{flex:0 1 auto;max-width:45%}
+.item-title::after{content:"＋ 记一次";flex:1 1 auto;min-width:0;display:flex;align-items:center;justify-content:center;min-height:32px;margin-left:0;font-size:11px;font-weight:600;color:var(--act);border:1px dashed var(--act);border-radius:6px;padding:3px 8px;background:var(--accent-soft);white-space:nowrap;transition:background .15s,color .15s}
+.item-title:hover::after{background:var(--act);color:var(--surface);border-style:solid}
+.item-title b[data-itemname],.items-head h2{text-decoration:none}
+.item-title b[data-itemname]:hover,.items-head h2:hover{text-decoration:none}
