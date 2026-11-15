@@ -339,16 +339,15 @@
         (day.getMonth() + 1 !== month || day.getFullYear() !== year ? ' out' : '') +
         (key === S.today ? ' today' : '') + (key === selectedCell ? ' sel' : '');
       var corner = '';
-      if (open.length) corner += '<span class="ct">待</span>';
-      if (d.anns.length) corner += '<span class="ct ann">纪</span>';
-      var marks = d.dues.length ? '<span class="mark">' + d.dues.length + '</span>' : '';
+      if (open.length) corner += '<span class="ct">待' + open.length + '</span>';
+      if (d.anns.length) corner += '<span class="ct ann">纪' + d.anns.length + '</span>';
+      if (d.dues.length) corner += '<span class="ct due">维' + d.dues.length + '</span>';
       html += '<div class="' + cls + '" data-iso="' + key + '" data-tip="' + M.esc(parts.join('\n')) + '">' +
         (corner ? '<span class="corner">' + corner + '</span>' : '') +
         '<span class="d">' + day.getDate() + '</span>' +
         (dayLabel(key) ? '<span class="lbl">' + M.esc(dayLabel(key)) + '</span>' : '') +
-        (open.length ? '<span class="todo1">' + M.esc(open[0].text) + '</span>' : '') +
-        (open.length > 1 ? '<span class="cnt">' + open.length + '</span>' : '') +
-        '<span class="marks">' + marks + '</span></div>';
+        (d.anns.length ? '<span class="todo1 ann1">' + M.esc(d.anns[0].name) + '</span>' : '') +
+        '</div>';
     }
     $('cal').innerHTML = html;
   }

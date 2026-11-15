@@ -335,3 +335,14 @@ input[type=checkbox]{width:22px;height:22px;min-height:22px;padding:0;margin:0;f
 .item-title::after{content:"＋ 记一次";margin-left:auto;flex:none;font-size:10px;font-weight:600;color:var(--act);border:1px dashed var(--act);border-radius:6px;padding:1px 6px;background:var(--accent-soft);white-space:nowrap}
 .item-title:hover::after{background:var(--act);color:var(--surface);border-style:solid}
 @media (max-width:520px){.items-head .spacer::after{content:"＋ 记维护"}.item-title::after{content:"＋ 记"}}
+.cell .corner{flex-direction:row;align-items:center;gap:2px}
+.cell .corner .ct{padding:0 3px;white-space:nowrap}
+.cell .corner .ct.due{color:var(--danger)}
+.cell .todo1.ann1{color:var(--warn)}
+:root{--c-todo:var(--accent);--c-ann:var(--warn);--c-due:var(--danger)}
+.todo-text,.menu .mt[data-mtodo-open]{color:var(--c-todo);text-decoration-color:var(--c-todo)}
+.ann-text,.menu .mt[data-mann-open]{color:var(--c-ann);text-decoration-color:var(--c-ann)}
+.due-click,.menu .mt[data-mdueslug]{color:var(--c-due);text-decoration-color:var(--c-due)}
+.todo-text:hover,.menu .mt[data-mtodo-open]:hover{color:var(--c-todo)}
+.ann-text:hover,.menu .mt[data-mann-open]:hover{color:var(--c-ann)}
+.due-click:hover,.menu .mt[data-mdueslug]:hover{color:var(--c-due)}
