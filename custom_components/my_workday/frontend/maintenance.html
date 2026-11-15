@@ -94,7 +94,7 @@
 (function () {
   'use strict';
   var M = window.MW, $ = M.$, S = null, busy = false, slug = null, retries = 0;
-  var editingSlug = null, lastCount = null, pendingDel = null;
+  var editingSlug = null, lastCount = null, pendingDel = null, itemOpen = {};
   var MASKS = ['projMask', 'itemMask', 'recMask'];
 
   function armDel(k) {
@@ -183,6 +183,7 @@
       var st = stateOf(i.id);
       var left = st.remaining_days == null ? '—' : (st.remaining_days <= 0 ? '已到期' : '还剩 ' + st.remaining_days + ' 天');
       var recs = itemRecords(p, i.id);
+      var open = !!itemOpen[i.id];
       var recHtml = recs.length ? recs.slice(0, 5).map(function (r) {
         var e = (r.entries || []).filter(function (x) { return x.item_id === i.id; })[0] || {};
         return '<div class="row rec-row" data-rec="' + M.esc(r.id) + '" data-recitem="' + M.esc(i.id) +
@@ -191,12 +192,15 @@
           M.esc(e.note || '') + '</span></div>';
       }).join('') + (recs.length > 5 ? '<div class="hint">还有 ' + (recs.length - 5) + ' 条</div>' : '') : '';
       return '<div class="mt-item"><div class="top item-title" data-item="' + M.esc(i.id) + '" title="点击编辑">' +
-        '<b>' + M.esc(i.name) + '</b>' + pill(st.status) + '</div>' +
+        '<b>' + M.esc(i.name) + '</b>' +
+        (i.note ? '<span class="item-note">' + M.esc(i.note) + '</span>' : '') +
+        pill(st.status) + '</div>' +
         '<div class="meta">上次维护：' + M.esc(i.last_date || '未设') + ' · ' + left +
         (p.need_counter && st.remaining_counter != null ? ' · 还剩 ' + st.remaining_counter + ' ' + M.esc(p.counter_unit || '') : '') +
         '</div>' +
-        (i.note ? '<div class="meta">' + M.esc(i.note) + '</div>' : '') +
-        (recHtml ? '<div class="sub-list item-records">' + recHtml + '</div>' : '') +
+        (recs.length ? '<div class="acts"><button class="ghost rec-toggle" data-rectoggle="' + M.esc(i.id) +
+          '">维护记录 (' + recs.length + ') ' + (open ? '▴' : '▸') + '</button></div>' : '') +
+        (open && recHtml ? '<div class="sub-list item-records">' + recHtml + '</div>' : '') +
         '</div>';
     }).join('') || '<div class="hint">还没有维护小项。</div>';
   }
@@ -425,7 +429,7 @@
     var t = e.target.closest && e.target.closest('[data-tab]'); if (!t) return;
     var target = t.dataset.tab;
     if (target === slug) { openForm(true); return; }
-    slug = target; lastCount = null; resetForms(); render();
+    slug = target; lastCount = null; itemOpen = {}; resetForms(); render();
   };
   $('projCounter').onchange = syncUnit;
   $('projSave').onclick = submitProject;
@@ -457,6 +461,8 @@
   $('items').onclick = function (e) {
     var p = project(); if (!p) return;
     var t = e.target;
+    var tg = t.closest && t.closest('[data-rectoggle]');
+    if (tg) { itemOpen[tg.dataset.rectoggle] = !itemOpen[tg.dataset.rectoggle]; renderItems(); return; }
     var own = t.closest && t.closest('[data-recitem]');
     if (own) { openRecForm(own.dataset.rec, own.dataset.recitem); return; }
     var title = t.closest && t.closest('[data-item]');

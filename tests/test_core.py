@@ -509,12 +509,15 @@ class TestRepo(unittest.TestCase):
     def test_item_own_records_clickable(self):
         m = (PKG / 'frontend' / 'maintenance.html').read_text(encoding='utf-8')
         for token in ('function itemRecords(', 'data-recitem=', 'item-records',
+                      'data-rectoggle=', 'itemOpen', '维护记录 (',
+                      'class="item-note"',
                       'openRecForm(recordId, focusItem)', 'id="recFocus"',
                       '编辑这条维护记录', '移除这条记录', 'renderRecEntries(p, rec, focusItem)',
                       'if (!focus || e.item_id === focus)'):
             self.assertIn(token, m)
         css = (PKG / 'frontend' / 'shared.css').read_text(encoding='utf-8')
         self.assertIn('.item-records{', css)
+        self.assertIn('.item-note{', css)
 
     def test_frontend_routing_and_ws_snapshot(self):
         init = (PKG / '__init__.py').read_text(encoding='utf-8')
