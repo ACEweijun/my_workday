@@ -502,6 +502,7 @@ class TestRepo(unittest.TestCase):
     def test_import_projects_interface(self):
         init = (PKG / '__init__.py').read_text(encoding='utf-8')
         self.assertIn('async def import_projects', init)
+        self.assertIn('if isinstance(raw_projects, dict):', init)
         self.assertIn('(SERVICE_IMPORT_PROJECTS, import_projects)', init)
         sv = (PKG / 'services.yaml').read_text(encoding='utf-8')
         self.assertIn('import_projects:', sv)
