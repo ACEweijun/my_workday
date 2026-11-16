@@ -3,6 +3,7 @@ window.MW = (function () {
   var DOMAIN = 'workday_maintenance';
   var EVENT = 'workday_maintenance_updated';
   var token = null, tokenExp = 0, listeners = [], sock = null, closed = false, ready = false, pending = {}, seq = 0;
+  var connSubscribed = false, connUnsub = null;
 
   function $(id) { return document.getElementById(id); }
   function esc(value) {
@@ -17,10 +18,15 @@ window.MW = (function () {
     try { var raw = localStorage.getItem('hassTokens'); return raw ? JSON.parse(raw) : null; }
     catch (e) { return null; }
   }
-  function resolveToken() {
+  function parentHassConn() {
+    try {
+      if (window.hassConnection) return window.hassConnection;
+      if (window.parent && window.parent !== window && window.parent.hassConnection) return window.parent.hassConnection;
+    } catch (e) {}
+    return null;
+  }
+  function legacyToken() {
     var now = Math.floor(Date.now() / 1000);
-    if (token && tokenExp > now + 30) return Promise.resolve(token);
-    token = null;
     var t = readTokens();
     if (!t || !t.access_token) return Promise.resolve(null);
     if (!t.expires || Number(t.expires) > now + 60) {
@@ -45,6 +51,27 @@ window.MW = (function () {
         return token;
       }).catch(function () { return null; });
   }
+  function resolveToken() {
+    var now = Math.floor(Date.now() / 1000);
+    if (token && tokenExp > now + 30) return Promise.resolve(token);
+    token = null;
+    var connP = parentHassConn();
+    if (connP) {
+      return connP.then(function (c) {
+        var tk = c && c.auth && c.auth.accessToken;
+        if (!tk) return legacyToken();
+        token = tk;
+        tokenExp = now + 60;
+        return token;
+      }).catch(function () { return legacyToken(); });
+    }
+    return legacyToken();
+  }
+  function callViaConn(c, service, data, wantResponse) {
+    var msg = { type: 'call_service', domain: DOMAIN, service: service,
+      service_data: data || {}, return_response: !!wantResponse };
+    return c.callWS(msg).then(function (res) { return wantResponse ? unwrap(res) : res; });
+  }
   function api(path, opt, retried) {
     return resolveToken().then(function (tk) {
       if (!tk) throw new Error('未获取到 HA 登录态');
@@ -67,6 +94,15 @@ window.MW = (function () {
     return x;
   }
   function call(service, data, wantResponse) {
+    var connP = parentHassConn();
+    if (connP) {
+      return connP.then(function (c) { return callViaConn(c, service, data, wantResponse); })
+        .catch(function () {
+          var path = '/api/services/' + DOMAIN + '/' + service + (wantResponse ? '?return_response=true' : '');
+          return api(path, { method: 'POST', body: JSON.stringify(data || {}) })
+            .then(wantResponse ? unwrap : function (x) { return x; });
+        });
+    }
     var path = '/api/services/' + DOMAIN + '/' + service + (wantResponse ? '?return_response=true' : '');
     return api(path, { method: 'POST', body: JSON.stringify(data || {}) })
       .then(wantResponse ? unwrap : function (x) { return x; });
@@ -89,6 +125,13 @@ window.MW = (function () {
     });
   }
   function snapshot() {
+    var connP = parentHassConn();
+    if (connP) {
+      return connP.then(function (c) { return c.callWS({ type: DOMAIN + '/snapshot' }); })
+        .catch(function () {
+          return snapshotViaWS().catch(function () { return call('get_snapshot', {}, true); });
+        });
+    }
     return snapshotViaWS().catch(function () { return call('get_snapshot', {}, true); });
   }
   function onUpdate(fn) { if (typeof fn === 'function') listeners.push(fn); }
@@ -97,6 +140,20 @@ window.MW = (function () {
   }
   function connect() {
     if (!isHA() || closed) return;
+    var connP = parentHassConn();
+    if (connP) {
+      if (connSubscribed) return;
+      connP.then(function (c) {
+        if (closed || connSubscribed || !c) return;
+        connSubscribed = true;
+        try {
+          c.subscribeEvents(function (ev) {
+            broadcast((ev && ev.data && ev.data.scope) || 'all');
+          }, EVENT).then(function (unsub) { connUnsub = unsub; });
+        } catch (e) {}
+      }).catch(function () {});
+      return;
+    }
     if (sock && (sock.readyState === 0 || sock.readyState === 1)) return;
     var proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
     try { sock = new WebSocket(proto + '//' + location.host + '/api/websocket'); }
@@ -157,6 +214,7 @@ window.MW = (function () {
     window.addEventListener('beforeunload', function () {
       closed = true;
       if (sock) { try { sock.close(); } catch (err) { } }
+      if (connUnsub) { try { connUnsub(); } catch (err) { } }
     });
   }
   function today() {
