@@ -65,6 +65,7 @@ SERVICE_UPDATE_RECORD = "update_record"
 SERVICE_DELETE_RECORD = "delete_record"
 SERVICE_EXPORT = "export_markdown"
 SERVICE_SYNC_TODOS = "sync_maintenance_todos"
+SERVICE_IMPORT_PROJECTS = "import_projects"
 
 PRESETS = {
     "vehicle": ("车辆", True, "公里", "里程", [

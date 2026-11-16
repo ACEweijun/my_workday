@@ -176,6 +176,7 @@
   }
   function applyWrite(service, data) {
     data = data || {};
+    var result = null;
     var w = SNAP.workday, m = SNAP.maintenance, p, it;
     switch (service) {
       case 'set_todos': w.todos = clone(data.todos || []); break;
@@ -272,6 +273,38 @@
           }
         }
         break;
+      case 'import_projects': {
+        var list = [];
+        try { list = JSON.parse(data.json || data.projects || '[]'); } catch (e) {}
+        if (!Array.isArray(list)) list = [];
+        var imp = { added: [], errors: [] };
+        list.forEach(function (pr) {
+          pr = pr || {};
+          var pname = String(pr.name || '').trim();
+          if (!pname) { imp.errors.push('项目缺少名称'); return; }
+          var pslug = pr.slug || slugifyDemo(pname);
+          if (m.projects.some(function (x) { return x.slug === pslug; })) { imp.errors.push('项目标识已存在：' + pslug); return; }
+          m.projects.push({
+            slug: pslug, name: pname, type: pr.type || 'custom',
+            need_counter: !!pr.need_counter,
+            counter_unit: pr.counter_unit || '', counter_label: pr.counter_label || '',
+            counter: (pr.counter === '' || pr.counter == null) ? null : Number(pr.counter),
+            items: (pr.items || []).map(function (it, idx) {
+              it = it || {};
+              return { id: 'i' + idx + Date.now().toString(36), name: it.name || ('小项' + (idx + 1)),
+                interval_days: (it.interval_days === '' || it.interval_days == null) ? null : Number(it.interval_days),
+                interval_counter: (it.interval_counter === '' || it.interval_counter == null) ? null : Number(it.interval_counter),
+                last_date: it.last_date || null,
+                last_counter: (it.last_counter === '' || it.last_counter == null) ? null : Number(it.last_counter),
+                note: it.note || '' };
+            }),
+            history: []
+          });
+          imp.added.push({ slug: pslug, name: pname, items: (pr.items || []).length });
+        });
+        result = imp;
+        break;
+      }
       case 'delete_record':
         p = findProject(data.slug);
         if (p) {
@@ -285,15 +318,51 @@
       default: break;
     }
     recompute(SNAP);
+    return result;
+  }
+
+  var ITEM_PRESETS = {
+    vehicle: [
+      { name: '机油 + 机油滤芯', interval_days: 180, interval_counter: 10000 },
+      { name: '空调滤芯', interval_days: 365, interval_counter: 20000 },
+      { name: '空气滤芯', interval_days: 365, interval_counter: 20000 },
+      { name: '轮胎换位', interval_days: 365, interval_counter: 20000 },
+      { name: '刹车油', interval_days: 730, interval_counter: null },
+      { name: '冷却液', interval_days: 730, interval_counter: null }
+    ],
+    appliance: [
+      { name: '清洗筒内 / 过滤器', interval_days: 90, interval_counter: null },
+      { name: '清理排水口 / 滤网', interval_days: 90, interval_counter: null },
+      { name: '检查密封圈与水管', interval_days: 180, interval_counter: null },
+      { name: '机身内外擦拭', interval_days: 30, interval_counter: null }
+    ],
+    furniture: [
+      { name: '清洗坐垫与靠背', interval_days: 180, interval_counter: null },
+      { name: '检查气压杆升降', interval_days: 365, interval_counter: null },
+      { name: '紧固螺丝与检查脚轮', interval_days: 365, interval_counter: null },
+      { name: '扶手与头枕除尘', interval_days: 30, interval_counter: null }
+    ],
+    area: [
+      { name: '刷洗马桶', interval_days: 7, interval_counter: null },
+      { name: '擦洗玻璃与镜面', interval_days: 30, interval_counter: null },
+      { name: '清理地漏与下水口', interval_days: 30, interval_counter: null },
+      { name: '除霉与通风', interval_days: 30, interval_counter: null }
+    ],
+    custom: [{ name: '例行检查', interval_days: 180, interval_counter: null }]
+  };
+
+  function slugifyDemo(name) {
+    var clean = String(name || '').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+    return clean || 'p_' + Date.now().toString(36);
   }
 
   // ---------- 拦截 MW ----------
   MW.isHA = function () { return true; };
   MW.snapshot = function () { return Promise.resolve(clone(SNAP)); };
   MW.call = function (service, data) {
-    applyWrite(service, data || {});
+    var out = applyWrite(service, data || {});
     MW.broadcast(scopeOf(service));
-    return Promise.resolve({ service_response: { ok: true } });
+    return Promise.resolve({ service_response: out || { ok: true } });
   };
   MW.start = function () {
     // 本地预览：不连 WebSocket、不弹"预览模式"横幅；数据由 snapshot 立即提供

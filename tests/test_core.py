@@ -499,6 +499,18 @@ class TestRepo(unittest.TestCase):
         # 距离卡片：只显示名称，日期移到 title
         self.assertIn("M.esc(ev.name) + '</div>'", w)
 
+    def test_import_projects_interface(self):
+        init = (PKG / '__init__.py').read_text(encoding='utf-8')
+        self.assertIn('async def import_projects', init)
+        self.assertIn('(SERVICE_IMPORT_PROJECTS, import_projects)', init)
+        sv = (PKG / 'services.yaml').read_text(encoding='utf-8')
+        self.assertIn('import_projects:', sv)
+        m = (PKG / 'frontend' / 'maintenance.html').read_text(encoding='utf-8')
+        self.assertIn("M.call('import_projects', { json: text }, true)", m)
+        self.assertIn('id="importMask"', m)
+        self.assertIn('id="importText"', m)
+        self.assertIn('id="projImport"', m)
+
     def test_delete_labels_are_explicit(self):
         m = (PKG / 'frontend' / 'maintenance.html').read_text(encoding='utf-8')
         for token in ('删除这个项目', '删除这个小项', '删除这次记录'):

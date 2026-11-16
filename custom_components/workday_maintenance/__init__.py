@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import datetime as dt
 import inspect
+import json
 import logging
 from pathlib import Path
 
@@ -28,7 +29,7 @@ from .const import (
     SERVICE_LIST_PROJECTS, SERVICE_LOG_SERVICE, SERVICE_REFRESH,
     SERVICE_SET_ANNIVERSARIES, SERVICE_SET_BASELINE, SERVICE_SET_COUNTER,
     SERVICE_SET_CUSTOM, SERVICE_SET_DAY, SERVICE_SET_TODOS, SERVICE_SET_YEAR,
-    SERVICE_SYNC_TODOS, SERVICE_UPDATE_ITEM, SERVICE_UPDATE_PROJECT,
+    SERVICE_IMPORT_PROJECTS, SERVICE_SYNC_TODOS, SERVICE_UPDATE_ITEM, SERVICE_UPDATE_PROJECT,
     SERVICE_UPDATE_RECORD, CONF_SYNC_DUE_TO_TODOS,
 )
 from .coordinator import MergedCoordinator
@@ -283,6 +284,68 @@ def _async_register_services(hass: HomeAssistant, coordinator: MergedCoordinator
         await coordinator.async_mutate(SCOPE_MAINTENANCE, mutate)
         return {"slug": slug, "name": name}
 
+    async def import_projects(call: ServiceCall) -> dict:
+        """批量导入项目与小项：projects 数组或 json 字符串二选一。"""
+        raw_projects = call.data.get("projects")
+        text = str(call.data.get("json") or "").strip()
+        if raw_projects is None and text:
+            try:
+                raw_projects = json.loads(text)
+            except ValueError as err:
+                raise HomeAssistantError(f"json 不是合法 JSON：{err}") from err
+        if not isinstance(raw_projects, list) or not raw_projects:
+            raise HomeAssistantError("需要提供 projects 数组或 json 字符串，且至少一个项目")
+        added, errors = [], []
+
+        def _num(v):
+            if v in (None, ""):
+                return None
+            try:
+                return int(v)
+            except (TypeError, ValueError):
+                return None
+
+        def _item(idx, it):
+            it = it if isinstance(it, dict) else {}
+            return {
+                "id": mnt._uid("i", _today().isoformat(), str(idx)),
+                "name": str(it.get("name") or f"小项{idx + 1}"),
+                "interval_days": _num(it.get("interval_days")),
+                "interval_counter": _num(it.get("interval_counter")),
+                "last_date": str(it.get("last_date")) if it.get("last_date") else None,
+                "last_counter": _num(it.get("last_counter")),
+                "note": str(it.get("note") or ""),
+            }
+
+        def mutate(raw):
+            projects = raw["maintenance"]["projects"]
+            for p in raw_projects:
+                p = p if isinstance(p, dict) else {}
+                name = str(p.get("name") or "").strip()
+                slug = str(p.get("slug") or mnt.slugify(name)).strip()
+                if not name or not slug:
+                    errors.append("项目缺少名称：" + json.dumps(p, ensure_ascii=False)[:80])
+                    continue
+                if any(x.get("slug") == slug for x in projects):
+                    errors.append("项目标识已存在：" + slug)
+                    continue
+                try:
+                    kind = str(p.get("type") or "custom")
+                    proj = mnt.make_project(
+                        slug, name, kind, bool(p.get("need_counter")),
+                        str(p.get("counter_unit") or ""),
+                        str(p.get("counter_label") or ""),
+                        p.get("counter"), _today())
+                    if isinstance(p.get("items"), list) and p["items"]:
+                        proj["items"] = [_item(i, it) for i, it in enumerate(p["items"])]
+                    projects.append(proj)
+                    added.append({"slug": slug, "name": name, "items": len(proj["items"])})
+                except Exception as err:  # noqa: BLE001
+                    errors.append(f"{name or '?'}：{err}")
+
+        await coordinator.async_mutate(SCOPE_MAINTENANCE, mutate)
+        return {"added": added, "errors": errors}
+
     async def update_project(call: ServiceCall) -> dict:
         slug = str(call.data.get("slug") or "")
 
@@ -431,6 +494,7 @@ def _async_register_services(hass: HomeAssistant, coordinator: MergedCoordinator
         (SERVICE_REFRESH, refresh), (SERVICE_SET_YEAR, set_year),
         (SERVICE_SET_TODOS, set_todos), (SERVICE_SET_ANNIVERSARIES, set_anniversaries),
         (SERVICE_ADD_PROJECT, add_project), (SERVICE_UPDATE_PROJECT, update_project),
+        (SERVICE_IMPORT_PROJECTS, import_projects),
         (SERVICE_DELETE_PROJECT, delete_project), (SERVICE_LIST_PROJECTS, list_projects),
         (SERVICE_SET_COUNTER, set_counter), (SERVICE_ADD_ITEM, add_item),
         (SERVICE_UPDATE_ITEM, update_item), (SERVICE_DELETE_ITEM, delete_item),
