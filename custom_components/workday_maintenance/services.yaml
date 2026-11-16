@@ -87,7 +87,7 @@ add_project:
 
 import_projects:
   name: "导入项目与小项"
-  description: "批量导入维护项目（可含小项与既有状态）。传 projects 数组，或直接粘一段 JSON，二者选一。"
+  description: "批量导入维护项目（可含小项与既有状态）。传 projects 数组，或直接粘一段 JSON（单个项目对象或数组都行），二者选一。"
   fields:
     json:
       name: "json"
