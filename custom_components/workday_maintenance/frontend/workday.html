@@ -24,6 +24,7 @@
     </div>
     <div class="cal-head" id="calHead"></div>
     <div class="cal" id="cal"><div class="hint" style="padding:20px">正在加载日历…</div></div>
+    <div class="cal-legend"><span class="lg work">上班</span><span class="lg rest">休息</span><span class="lg cust-rest">标休</span><span class="lg cust-work">标班</span></div>
   </section>
 
   <section class="card fold-card">
@@ -104,6 +105,7 @@
   </div>
 </div>
 <script src="shared.js"></script>
+<script src="demo-data.js"></script>
 <script>
 (function () {
   'use strict';
@@ -205,6 +207,14 @@
     var g = M.dateOf(key).getDay();
     return g >= 1 && g <= 5;
   }
+  function cellKind(key, day) {
+    var w = S.workday, h = S.holidays || {};
+    var isWeekday = day.getDay() >= 1 && day.getDay() <= 5;
+    var base = baseWork(key);
+    if ((w.custom_rest || []).indexOf(key) >= 0) return base ? 'cust-rest' : (isWeekday ? 'work' : 'rest');
+    if ((w.custom_work || []).indexOf(key) >= 0) return !base ? 'cust-work' : (isWeekday ? 'work' : 'rest');
+    return base ? 'work' : 'rest';
+  }
   function customMode(key) {
     var w = S.workday;
     if ((w.custom_work || []).indexOf(key) >= 0) return 'work';
@@ -216,7 +226,7 @@
     if (cm) {
       if (cm === 'work' && baseWork(key)) return '';
       if (cm === 'rest' && !baseWork(key)) return '';
-      return cm === 'work' ? '班' : '休';
+      return cm === 'work' ? '手动标班' : '手动标休';
     }
     if ((h.makeup || []).indexOf(key) >= 0) return '补班';
     if ((h.off || []).indexOf(key) >= 0) return (h.names || {})[key] || '放假';
@@ -226,8 +236,7 @@
     var w = S.workday, ms = monthStats(), ev = nextSpecialDay();
     var third = ev
       ? '<div class="num orange">' + (ev.days === 0 ? '今天' : ev.days + ' 天') + '</div>' +
-        '<div class="lbl">距离</div>' +
-        '<div class="sub2" title="' + M.esc(ev.name + ' · ' + ev.date) + '">' + M.esc(ev.name) + '</div>'
+        '<div class="lbl ellip" title="' + M.esc(ev.name + ' · ' + ev.date) + '">距离 - ' + M.esc(ev.name) + '</div>'
       : '<div class="num red">' + S.maintenance.due_total + ' 项</div><div class="lbl">维护已到期</div>';
     $('stats').innerHTML =
       '<div class="stat"><div class="num blue">' + ms.left + ' / ' + ms.total + '</div>' +
@@ -326,27 +335,38 @@
     var html = '';
     for (var i = 0; i < weeks * 7; i++) {
       var day = new Date(start); day.setDate(start.getDate() + i);
-      var key = iso(day), c = classify(day), d = cellData(key);
+      var key = iso(day), d = cellData(key);
+      var kind = cellKind(key, day);
       var open = d.todos.filter(function (t) { return !t.done; });
       var parts = [];
+      var dl = dayLabel(key);
+      if (dl) parts.push((kind === 'cust-rest' || kind === 'cust-work' ? '安排：' : '假日：') + dl);
       open.forEach(function (t) { parts.push('待办：' + t.text); });
       d.anns.forEach(function (a) { parts.push('纪念：' + a.name); });
       d.dues.forEach(function (x) {
         var late = x.due_date < key && x.status === 'due' ? '（逾期 ' + M.dayDiff(key, x.due_date) + ' 天）' : '';
         parts.push('维护：' + x.project + ' · ' + x.name + late);
       });
-      var cls = 'cell ' + (c.work ? 'work' : 'rest') +
+      var cls = 'cell ' + kind +
         (day.getMonth() + 1 !== month || day.getFullYear() !== year ? ' out' : '') +
         (key === S.today ? ' today' : '') + (key === selectedCell ? ' sel' : '');
-      var corner = '';
-      if (open.length) corner += '<span class="ct">待' + open.length + '</span>';
-      if (d.anns.length) corner += '<span class="ct ann">纪' + d.anns.length + '</span>';
-      if (d.dues.length) corner += '<span class="ct due">维' + d.dues.length + '</span>';
+      var lineType = d.anns.length ? 'ann' : open.length ? 'todo' : d.dues.length ? 'due' : '';
+      var tags = '';
+      if (open.length && lineType !== 'todo') tags += '<span class="tg">待' + open.length + '</span>';
+      if (d.dues.length && lineType !== 'due') tags += '<span class="tg due">维' + d.dues.length + '</span>';
+      var line = '';
+      if (lineType === 'ann') {
+        line = (d.anns.length > 1 ? '<span class="tg ann">纪' + d.anns.length + '</span>' : '') + M.esc(d.anns[0].name);
+      } else if (lineType === 'todo') {
+        line = (open.length > 1 ? '<span class="tg">待' + open.length + '</span>' : '') + M.esc(open[0].text);
+      } else if (lineType === 'due') {
+        line = (d.dues.length > 1 ? '<span class="tg due">维' + d.dues.length + '</span>' : '') + M.esc(d.dues[0].name);
+      }
       html += '<div class="' + cls + '" data-iso="' + key + '" data-tip="' + M.esc(parts.join('\n')) + '">' +
-        (corner ? '<span class="corner">' + corner + '</span>' : '') +
-        '<span class="d">' + day.getDate() + '</span>' +
-        (dayLabel(key) ? '<span class="lbl">' + M.esc(dayLabel(key)) + '</span>' : '') +
-        (d.anns.length ? '<span class="todo1 ann1">' + M.esc(d.anns[0].name) + '</span>' : '') +
+        '<div class="cell-top"><span class="d">' + day.getDate() + '</span>' +
+        (tags ? '<span class="cell-tags">' + tags + '</span>' : '') +
+        '</div>' +
+        (line ? '<span class="ann-line ' + lineType + '">' + line + '</span>' : '') +
         '</div>';
     }
     $('cal').innerHTML = html;
@@ -385,7 +405,9 @@
     var el = $('cellTip');
     el.innerHTML = raw.split('\n').filter(function (line) { return line; }).map(function (line) {
       var cls = line.indexOf('待办：') === 0 ? 'tip-todo' :
-                line.indexOf('纪念：') === 0 ? 'tip-ann' : 'tip-due';
+                line.indexOf('纪念：') === 0 ? 'tip-ann' :
+                line.indexOf('假日：') === 0 ? 'tip-holiday' :
+                line.indexOf('安排：') === 0 ? (line.indexOf('标班') >= 0 ? 'tip-cust-work' : 'tip-cust-rest') : 'tip-due';
       return '<div class="' + cls + '">' + M.esc(line) + '</div>';
     }).join('');
     el.hidden = false;
@@ -428,7 +450,10 @@
       : d === 0 ? '今天' : d === 1 ? '明天' : String(t.date).slice(5);
   }
   function todoRow(t) {
-    return '<div class="row' + (t.done ? ' done' : '') + '">' +
+    var cls = t.done ? ' done'
+      : M.dayDiff(t.date, S.today) < 0 ? ' late'
+      : t.date === S.today ? ' todayrow' : '';
+    return '<div class="row' + cls + '">' +
       '<span class="sub todo-when">' + todoWhen(t) + '</span>' +
       '<input type="checkbox" data-todo-check="' + M.esc(t.id) + '"' + (t.done ? ' checked' : '') + '>' +
       '<span class="txt todo-text" data-todo-edit="' + M.esc(t.id) + '" title="点击编辑">' + M.esc(t.text) + '</span>' +

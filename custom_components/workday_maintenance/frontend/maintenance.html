@@ -13,8 +13,10 @@
   <aside class="mt-side" id="projSide"></aside>
   <div class="mt-main">
     <section class="card">
-      <div class="form" id="counterBox" hidden>
-        <div><label id="counterLabel">当前计数</label><input type="number" id="counterValue"></div>
+      <div class="counter-strip" id="counterBox" hidden>
+        <span class="counter-label" id="counterLabel">当前计数</span>
+        <input type="number" id="counterValue">
+        <span class="counter-unit" id="counterUnit"></span>
       </div>
       <div class="hint" id="projHint">还没有项目，点「+ 新建」。</div>
     </section>
@@ -90,6 +92,7 @@
 </div>
 
 <script src="shared.js"></script>
+<script src="demo-data.js"></script>
 <script>
 (function () {
   'use strict';
@@ -163,7 +166,8 @@
     if (!p) { $('counterBox').hidden = true; return; }
     $('counterBox').hidden = !p.need_counter;
     if (p.need_counter) {
-      $('counterLabel').textContent = '更新当前' + (p.counter_label || '计数') + '（' + (p.counter_unit || '') + '）';
+      $('counterLabel').textContent = '更新当前' + (p.counter_label || '计数');
+      $('counterUnit').textContent = p.counter_unit || '';
       $('recCounterLabel').textContent = '当前' + (p.counter_label || '计数');
       if (lastCount !== p.counter) {
         $('counterValue').value = p.counter == null ? '' : p.counter;
@@ -192,7 +196,7 @@
       if (!last) {
         meta = '<div class="item-meta-static">暂无维护记录</div>';
       } else {
-        var bits = ['最新维护：' + M.esc(last.date)];
+        var bits = ['上次 ' + M.esc(last.date)];
         if (last.counter != null && last.counter !== '') {
           bits.push(M.esc(last.counter) + (p.need_counter ? ' ' + M.esc(p.counter_unit || '') : ''));
         }
@@ -207,7 +211,7 @@
           (r.counter != null ? ' · ' + M.esc(r.counter) : '') + '</span><span class="txt">' +
           M.esc(e.note || '') + '</span></div>';
       }).join('') + (recs.length > 5 ? '<div class="hint">还有 ' + (recs.length - 5) + ' 条</div>' : '') : '';
-      return '<div class="mt-item"><div class="top item-title" data-item="' + M.esc(i.id) +
+      return '<div class="mt-item st-' + M.esc(st.status || 'unset') + '"><div class="top item-title" data-item="' + M.esc(i.id) +
         '" title="点名称编辑小项 · 点空白处给它记一次新维护">' +
         '<b data-itemname title="点击编辑小项">' + M.esc(i.name) + '</b>' +
         (i.note ? '<span class="item-note">' + M.esc(i.note) + '</span>' : '') +

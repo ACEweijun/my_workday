@@ -259,7 +259,7 @@ class TestRepo(unittest.TestCase):
 
     def test_next_special_day_merges_holidays_and_anniversaries(self):
         html = (PKG / 'frontend' / 'workday.html').read_text(encoding='utf-8')
-        for token in ('function nextSpecialDay()', '<div class="lbl">距离</div>',
+        for token in ('function nextSpecialDay()', '>距离 - ',
                       'S.workday.anniversaries', 'h.off || []'):
             self.assertIn(token, html)
         self.assertNotIn('next_holiday', html)
@@ -272,8 +272,9 @@ class TestRepo(unittest.TestCase):
                      '算休息</button>', '恢复安排</button>', 'function inlineEdit('):
             self.assertNotIn(gone, html)
         css = (PKG / 'frontend' / 'shared.css').read_text(encoding='utf-8')
-        self.assertIn('.stat .sub2', css)
-        self.assertIn('.cell .d{font-size:17px', css)
+        self.assertNotIn('.stat .sub2', css)
+        self.assertIn('.stat .lbl.ellip', css)
+        self.assertIn('.cell .d{font-size:19px', css)
         self.assertIn('.cal-head div{font-size:13px', css)
 
     def test_delete_project_confirmation_works(self):
@@ -569,7 +570,7 @@ class TestRepo(unittest.TestCase):
         m = (PKG / 'frontend' / 'maintenance.html').read_text(encoding='utf-8')
         for token in ('function itemRecords(', 'data-recitem=', 'item-records',
                       'data-rectoggle=', 'itemOpen', 'class="item-note"',
-                      'item-meta-toggle', '最新维护：', '暂无维护记录',
+                      'item-meta-toggle', "'上次 ' + M.esc(last.date)", '暂无维护记录',
                       'openRecForm(recordId, focusItem)', 'id="recFocus"',
                       '编辑这条维护记录', '移除这条记录', 'renderRecEntries(p, rec, focusItem)',
                       'if (!focus || e.item_id === focus)'):
@@ -623,7 +624,7 @@ class TestRepo(unittest.TestCase):
 
     def test_item_meta_shows_latest_record(self):
         m = (PKG / 'frontend' / 'maintenance.html').read_text(encoding='utf-8')
-        for token in ('var last = recs[0] || null', "'最新维护：' + M.esc(last.date)",
+        for token in ('var last = recs[0] || null', "'上次 ' + M.esc(last.date)",
                       '暂无维护记录', 'item-meta-static', 'lastEntry'):
             self.assertIn(token, m)
         self.assertNotIn('上次维护：', m)
