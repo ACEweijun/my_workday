@@ -340,6 +340,18 @@ def _async_register_services(hass: HomeAssistant, coordinator: MergedCoordinator
                         p.get("counter"), _today())
                     if isinstance(p.get("items"), list) and p["items"]:
                         proj["items"] = [_item(i, it) for i, it in enumerate(p["items"])]
+                    # 用小项的上次维护日期生成对应的历史流水（页面「最新维护」读这里）
+                    histories = []
+                    for it in proj["items"]:
+                        if it.get("last_date"):
+                            histories.append({
+                                "id": mnt._uid("r", slug, it["last_date"], it["id"]),
+                                "date": it["last_date"],
+                                "counter": it.get("last_counter"),
+                                "entries": [{"item_id": it["id"], "note": it.get("note") or ""}],
+                            })
+                    histories.sort(key=lambda r: r["date"])
+                    proj["history"] = histories
                     projects.append(proj)
                     added.append({"slug": slug, "name": name, "items": len(proj["items"])})
                 except Exception as err:  # noqa: BLE001
