@@ -293,6 +293,8 @@ def _async_register_services(hass: HomeAssistant, coordinator: MergedCoordinator
                 raw_projects = json.loads(text)
             except ValueError as err:
                 raise HomeAssistantError(f"json 不是合法 JSON：{err}") from err
+        if isinstance(raw_projects, dict):
+            raw_projects = [raw_projects]
         if not isinstance(raw_projects, list) or not raw_projects:
             raise HomeAssistantError("需要提供 projects 数组或 json 字符串，且至少一个项目")
         added, errors = [], []
