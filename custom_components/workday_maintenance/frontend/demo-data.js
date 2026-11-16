@@ -284,21 +284,28 @@
           if (!pname) { imp.errors.push('项目缺少名称'); return; }
           var pslug = pr.slug || slugifyDemo(pname);
           if (m.projects.some(function (x) { return x.slug === pslug; })) { imp.errors.push('项目标识已存在：' + pslug); return; }
+          var newItems = (pr.items || []).map(function (it, idx) {
+            it = it || {};
+            return { id: 'i' + idx + Date.now().toString(36), name: it.name || ('小项' + (idx + 1)),
+              interval_days: (it.interval_days === '' || it.interval_days == null) ? null : Number(it.interval_days),
+              interval_counter: (it.interval_counter === '' || it.interval_counter == null) ? null : Number(it.interval_counter),
+              last_date: it.last_date || null,
+              last_counter: (it.last_counter === '' || it.last_counter == null) ? null : Number(it.last_counter),
+              note: it.note || '' };
+          });
+          var newHist = [];
+          newItems.forEach(function (it) {
+            if (it.last_date) newHist.push({ id: 'r' + Date.now().toString(36) + it.id,
+              date: it.last_date, counter: it.last_counter,
+              entries: [{ item_id: it.id, note: it.note || '' }] });
+          });
+          newHist.sort(function (a, b) { return a.date.localeCompare(b.date); });
           m.projects.push({
             slug: pslug, name: pname, type: pr.type || 'custom',
             need_counter: !!pr.need_counter,
             counter_unit: pr.counter_unit || '', counter_label: pr.counter_label || '',
             counter: (pr.counter === '' || pr.counter == null) ? null : Number(pr.counter),
-            items: (pr.items || []).map(function (it, idx) {
-              it = it || {};
-              return { id: 'i' + idx + Date.now().toString(36), name: it.name || ('小项' + (idx + 1)),
-                interval_days: (it.interval_days === '' || it.interval_days == null) ? null : Number(it.interval_days),
-                interval_counter: (it.interval_counter === '' || it.interval_counter == null) ? null : Number(it.interval_counter),
-                last_date: it.last_date || null,
-                last_counter: (it.last_counter === '' || it.last_counter == null) ? null : Number(it.last_counter),
-                note: it.note || '' };
-            }),
-            history: []
+            items: newItems, history: newHist
           });
           imp.added.push({ slug: pslug, name: pname, items: (pr.items || []).length });
         });
