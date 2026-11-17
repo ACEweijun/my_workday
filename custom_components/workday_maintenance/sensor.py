@@ -1,6 +1,8 @@
 """传感器：工作日统计 + 维护到期汇总 + 今日待办总数。"""
 from __future__ import annotations
 
+import datetime as dt
+
 from homeassistant.components.sensor import SensorEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
@@ -10,7 +12,8 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import (
     DOMAIN, ENTITY_DUE_MAINTENANCE, ENTITY_LEFT, ENTITY_NEXT_HOLIDAY,
-    ENTITY_PROGRESS, ENTITY_TODAY_TASKS, ENTITY_TOTAL,
+    ENTITY_PROGRESS, ENTITY_TODAY_DATE, ENTITY_TODAY_TASKS,
+    ENTITY_TODAY_WEEKDAY, ENTITY_TOTAL,
 )
 from .coordinator import MergedCoordinator
 
@@ -22,6 +25,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry,
         LeftSensor(coordinator, entry), TotalSensor(coordinator, entry),
         ProgressSensor(coordinator, entry), NextHolidaySensor(coordinator, entry),
         DueMaintenanceSensor(coordinator, entry), TodayTasksSensor(coordinator, entry),
+        TodayDateSensor(coordinator, entry), TodayWeekdaySensor(coordinator, entry),
     ])
 
 
@@ -181,3 +185,59 @@ class TodayTasksSensor(Base):
         return {"open_todos": [t.get("text") for t in todos],
                 "due_maintenance": [d["name"] for d in self.mt.get("due_items") or []
                                     if d["status"] == "due"]}
+
+
+class TodayDateSensor(Base):
+    """今天的日期（YYYY-MM-DD 字符串，方便自动化与显示）。"""
+    _attr_name = "今天日期"
+    _attr_icon = "mdi:calendar-today"
+
+    def __init__(self, coordinator, entry):
+        super().__init__(coordinator, entry)
+        self.entity_id = ENTITY_TODAY_DATE
+        self._attr_unique_id = f"{entry.entry_id}_today_date"
+
+    @property
+    def native_value(self):
+        return (self.coordinator.data or {}).get("today")
+
+
+class TodayWeekdaySensor(Base):
+    """今天星期几（中文），并附带数字/英文属性便于自动化。"""
+    _attr_name = "今天星期几"
+    _attr_icon = "mdi:calendar-week"
+
+    _WEEKDAY_CN = ("星期一", "星期二", "星期三", "星期四", "星期五", "星期六", "星期日")
+    _WEEKDAY_EN = ("Monday", "Tuesday", "Wednesday", "Thursday",
+                   "Friday", "Saturday", "Sunday")
+
+    def __init__(self, coordinator, entry):
+        super().__init__(coordinator, entry)
+        self.entity_id = ENTITY_TODAY_WEEKDAY
+        self._attr_unique_id = f"{entry.entry_id}_today_weekday"
+
+    def _date(self):
+        today = (self.coordinator.data or {}).get("today")
+        if not today:
+            return None
+        try:
+            return dt.date.fromisoformat(str(today)[:10])
+        except (ValueError, TypeError):
+            return None
+
+    @property
+    def native_value(self):
+        d = self._date()
+        if not d:
+            return None
+        return self._WEEKDAY_CN[d.weekday()]
+
+    @property
+    def extra_state_attributes(self):
+        d = self._date()
+        if not d:
+            return {}
+        return {"weekday_num": d.isoweekday(),  # 1=周一 ... 7=周日
+                "weekday_en": self._WEEKDAY_EN[d.weekday()],
+                "date": d.isoformat(),
+                "is_weekend": d.weekday() >= 5}
