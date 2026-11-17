@@ -35,6 +35,18 @@ from .const import (
 from .coordinator import MergedCoordinator
 
 _LOGGER = logging.getLogger(__name__)
+
+
+def _frontend_version() -> str:
+    """返回集成版本号（manifest.json），用于前端静态资源缓存破坏。"""
+    try:
+        return json.loads(
+            (Path(__file__).parent / "manifest.json").read_text(encoding="utf-8")
+        ).get("version", "0")
+    except Exception:  # noqa: BLE001
+        return "0"
+
+
 PLATFORMS = [Platform.SENSOR, Platform.BINARY_SENSOR, Platform.CALENDAR]
 _FRONTEND_FILES = frozenset({"workday.html", "maintenance.html", "shared.js", "shared.css"})
 
@@ -50,7 +62,20 @@ class FrontendFileView(HomeAssistantView):
         path = Path(__file__).parent / "frontend" / filename
         if not path.is_file():
             raise web.HTTPNotFound()
-        return web.FileResponse(path)
+        # 静态资源一律协商缓存：文件变了浏览器立刻能发现，不再拿旧缓存。
+        headers = {"Cache-Control": "no-cache"}
+        if filename.endswith(".html"):
+            # HTML 内的 css/js 引用带上版本号，改版后 URL 变化强制重新下载。
+            text = path.read_text(encoding="utf-8")
+            v = _frontend_version()
+            for asset in ("shared.css", "shared.js"):
+                text = text.replace(
+                    '="' + asset + '"', '="' + asset + '?v=' + v + '"'
+                )
+            return web.Response(
+                text=text, content_type="text/html", headers=headers
+            )
+        return web.FileResponse(path, headers=headers)
 
 
 @websocket_api.websocket_command({"type": "workday_maintenance/snapshot"})
@@ -128,7 +153,7 @@ async def _async_register_panels(hass: HomeAssistant) -> None:
                 sidebar_title=title,
                 sidebar_icon=icon,
                 frontend_url_path=path,
-                config={"url": f"{PANEL_URL}/{page}"},
+                config={"url": f"{PANEL_URL}/{page}?v={_frontend_version()}"},
                 require_admin=False,
             )
             if inspect.isawaitable(result):
