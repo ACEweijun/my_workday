@@ -211,7 +211,9 @@
         meta = '<div class="item-meta-static">暂无维护记录</div>';
       } else {
         var bits = ['上次 ' + M.esc(last.date)];
-        if (last.counter != null && last.counter !== '') {
+        // 里程为 0 / 空通常是没填的占位，不显示，避免制造噪音；真实里程(>0)才保留。
+        var cnt = Number(last.counter);
+        if (last.counter != null && last.counter !== '' && !isNaN(cnt) && cnt > 0) {
           bits.push(M.esc(last.counter) + (p.need_counter ? ' ' + M.esc(p.counter_unit || '') : ''));
         }
         meta = '<button class="ghost item-meta-toggle" data-rectoggle="' + M.esc(i.id) +
