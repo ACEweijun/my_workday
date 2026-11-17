@@ -335,7 +335,7 @@ class TestRepo(unittest.TestCase):
     def test_stats_follow_month_and_jump_today(self):
         html = (PKG / 'frontend' / 'workday.html').read_text(encoding='utf-8')
         for token in ('function monthStats()', 'function jumpToday()',
-                      'data-jump-today', '月 · 剩余/总数',
+                      'data-jump-today', ' 进度', 'padStart(2',
                       'renderStats(); renderCal();'):
             self.assertIn(token, html)
         self.assertNotIn('dateLabel', html)
