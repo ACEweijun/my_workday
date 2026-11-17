@@ -61,7 +61,7 @@
     <div class="modal-head"><b id="importTitle">导入数据</b>
       <button class="ghost" id="importClose" aria-label="关闭">×</button></div>
     <div class="modal-body">
-      <div class="hint">粘贴「导出全部数据」生成的 JSON 即可完整恢复（项目、小项、维护记录原样还原）。也兼容旧格式：单个项目对象或项目数组，字段 name 必填。<b>同名 slug 的项目会跳过，不会覆盖</b>——恢复前请先删除同名项目。</div>
+      <div class="hint">粘贴「导出」生成的存档 JSON，即可恢复全部用户数据（待办、纪念日、自定义班休 + 维护项目/小项/历史）。也兼容旧格式（项目对象或数组）。<b>同名 slug 的项目会跳过，不覆盖</b>——恢复前请先删除同名项目；工作日数据为覆盖式恢复。</div>
       <div><textarea id="importText" rows="10">{
   "name": "卡罗拉1.2T",
   "need_counter": true,
@@ -303,8 +303,8 @@
   function openProjMenu(btn) {
     var el = $('pmMenu');
     el.innerHTML = '<button data-menu-act="new">新建项目</button>' +
-      '<button data-menu-act="import">导入项目与小项</button>' +
-      '<button data-menu-act="export">导出全部数据 (.json)</button>';
+      '<button data-menu-act="import">导入</button>' +
+      '<button data-menu-act="export">导出</button>';
     var r = btn.getBoundingClientRect();
     el.hidden = false;
     var left = Math.max(8, Math.min(r.left, window.innerWidth - el.offsetWidth - 8));
