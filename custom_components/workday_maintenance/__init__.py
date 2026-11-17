@@ -25,7 +25,7 @@ from .const import (
     PANEL_MAINTENANCE, PANEL_MAINTENANCE_PATH, PANEL_URL, PANEL_WORKDAY,
     SCOPE_MAINTENANCE, SCOPE_WORKDAY, SERVICE_ADD_ITEM, SERVICE_ADD_PROJECT,
     SERVICE_CLEAR_CUSTOM, SERVICE_DELETE_ITEM, SERVICE_DELETE_PROJECT,
-    SERVICE_DELETE_RECORD, SERVICE_EXPORT, SERVICE_GET_SNAPSHOT,
+    SERVICE_DELETE_RECORD, SERVICE_EXPORT, SERVICE_EXPORT_ALL, SERVICE_GET_SNAPSHOT,
     SERVICE_LIST_PROJECTS, SERVICE_LOG_SERVICE, SERVICE_REFRESH,
     SERVICE_SET_ANNIVERSARIES, SERVICE_SET_BASELINE, SERVICE_SET_COUNTER,
     SERVICE_SET_CUSTOM, SERVICE_SET_DAY, SERVICE_SET_TODOS, SERVICE_SET_YEAR,
@@ -334,8 +334,10 @@ def _async_register_services(hass: HomeAssistant, coordinator: MergedCoordinator
 
         def _item(idx, it):
             it = it if isinstance(it, dict) else {}
+            # 全量备份带 id 时原样保留，保证 history.entries.item_id 引用不失效。
+            item_id = str(it.get("id")) if it.get("id") else mnt._uid("i", _today().isoformat(), str(idx))
             return {
-                "id": mnt._uid("i", _today().isoformat(), str(idx)),
+                "id": item_id,
                 "name": str(it.get("name") or f"小项{idx + 1}"),
                 "interval_days": _num(it.get("interval_days")),
                 "interval_counter": _num(it.get("interval_counter")),
@@ -365,17 +367,37 @@ def _async_register_services(hass: HomeAssistant, coordinator: MergedCoordinator
                         p.get("counter"), _today())
                     if isinstance(p.get("items"), list) and p["items"]:
                         proj["items"] = [_item(i, it) for i, it in enumerate(p["items"])]
-                    # 用小项的上次维护日期生成对应的历史流水（页面「最新维护」读这里）
-                    histories = []
-                    for it in proj["items"]:
-                        if it.get("last_date"):
+                    # 全量备份带 history 时原样还原（保留 id/date/counter/entries）；
+                    # 旧格式没有 history 时，才按小项 last_date 生成流水。
+                    if isinstance(p.get("history"), list) and p["history"]:
+                        histories = []
+                        for hi, hr in enumerate(p["history"]):
+                            hr = hr if isinstance(hr, dict) else {}
+                            entries = []
+                            for e in (hr.get("entries") or []):
+                                if isinstance(e, dict):
+                                    entries.append({
+                                        "item_id": str(e.get("item_id") or ""),
+                                        "note": str(e.get("note") or ""),
+                                    })
                             histories.append({
-                                "id": mnt._uid("r", slug, it["last_date"], it["id"]),
-                                "date": it["last_date"],
-                                "counter": it.get("last_counter"),
-                                "entries": [{"item_id": it["id"], "note": it.get("note") or ""}],
+                                "id": str(hr.get("id")) if hr.get("id") else mnt._uid("r", slug, str(hi)),
+                                "date": str(hr.get("date") or _today().isoformat()),
+                                "counter": _num(hr.get("counter")),
+                                "entries": entries,
                             })
-                    histories.sort(key=lambda r: r["date"])
+                        histories.sort(key=lambda r: r.get("date") or "")
+                    else:
+                        histories = []
+                        for it in proj["items"]:
+                            if it.get("last_date"):
+                                histories.append({
+                                    "id": mnt._uid("r", slug, it["last_date"], it["id"]),
+                                    "date": it["last_date"],
+                                    "counter": it.get("last_counter"),
+                                    "entries": [{"item_id": it["id"], "note": it.get("note") or ""}],
+                                })
+                        histories.sort(key=lambda r: r["date"])
                     proj["history"] = histories
                     projects.append(proj)
                     added.append({"slug": slug, "name": name, "items": len(proj["items"])})
@@ -521,6 +543,19 @@ def _async_register_services(hass: HomeAssistant, coordinator: MergedCoordinator
         project = _project(raw, slug)
         return {"markdown": mnt.export_markdown(project, _today(), coordinator.soon_days)}
 
+    async def export_all(call: ServiceCall) -> dict:
+        """导出全部项目（含所有小项与完整维护记录），格式与 import_projects 对称。"""
+        raw = await coordinator.store.async_load()
+        projects = (raw.get("maintenance") or {}).get("projects") or []
+        # 原样导出项目完整字段；只做浅拷贝避免改动内存数据。
+        data = {
+            "format": "workday_maintenance",
+            "version": 1,
+            "exported_at": _today().isoformat(),
+            "projects": [dict(p) for p in projects],
+        }
+        return {"json": json.dumps(data, ensure_ascii=False, indent=2)}
+
     async def sync_todos(_call: ServiceCall) -> dict:
         added = await coordinator.async_sync_due_todos(True)
         await coordinator.async_refresh()
@@ -539,7 +574,8 @@ def _async_register_services(hass: HomeAssistant, coordinator: MergedCoordinator
         (SERVICE_UPDATE_ITEM, update_item), (SERVICE_DELETE_ITEM, delete_item),
         (SERVICE_SET_BASELINE, set_baseline), (SERVICE_LOG_SERVICE, log_service),
         (SERVICE_UPDATE_RECORD, update_record), (SERVICE_DELETE_RECORD, delete_record),
-        (SERVICE_EXPORT, export), (SERVICE_SYNC_TODOS, sync_todos),
+        (SERVICE_EXPORT, export), (SERVICE_EXPORT_ALL, export_all),
+        (SERVICE_SYNC_TODOS, sync_todos),
     )
     for name, handler in handlers:
         register(name, handler)
