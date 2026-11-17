@@ -239,9 +239,79 @@ window.MW = (function () {
     toast('正在加载数据…');
     connect();
   }
+  // ---- 页面公共助手（workday / maintenance 共用，避免重复实现分叉）----
+
+  // 日期输入框：点整行任意位置都能弹出系统日历（原生日历图标铺满 + showPicker 双保险）。
+  function bindDateFields() {
+    var list = document.querySelectorAll('input[type=date]');
+    Array.prototype.forEach.call(list, function (el) {
+      var row = el.parentNode, last = 0;
+      if (row && row.classList) {
+        row.classList.add('date-field');
+        var lab = row.querySelector && row.querySelector('label');
+        if (lab && el.id && !lab.htmlFor) lab.htmlFor = el.id;
+      }
+      if (row) row.addEventListener('click', function (e) {
+        if (el.disabled || el.readOnly) return;
+        var now = Date.now();
+        if (now - last < 250) return;
+        last = now;
+        try {
+          if (typeof el.showPicker === 'function') el.showPicker();
+          else el.focus();
+        } catch (err) { el.focus(); }
+      });
+    });
+  }
+
+  // 通用加载骨架：两页 load() 的 busy/snapshot/重试逻辑完全相同，业务差异用回调注入。
+  // opts: { validate(d)->bool, onData(d), render() }
+  function createLoader(opts) {
+    var busy = false, retries = 0;
+    function retryLoad() {
+      if (retries >= 3) return;
+      retries++;
+      setTimeout(load, 2000);
+    }
+    function load() {
+      // 走 MW 对象动态取方法，保证 demo-data.js 等覆盖层能生效（本地预览取虚拟数据）。
+      var api = window.MW;
+      if (busy || !api.isHA()) return Promise.resolve();
+      busy = true;
+      return api.snapshot().then(function (d) {
+        if (!d || !opts.validate(d)) {
+          throw new Error('快照格式异常：' + JSON.stringify(d).slice(0, 160));
+        }
+        retries = 0;
+        opts.onData(d);
+        api.setReady(true);
+        opts.render();
+      }).catch(function (e) {
+        api.setReady(false);
+        api.toast('加载失败：' + e.message + '，自动重试中', true);
+        retryLoad();
+      }).finally(function () { busy = false; });
+    }
+    return { load: load, retryLoad: retryLoad };
+  }
+
+  // 二次确认删除：同一 key 连点两次才返回 true；reset() 供表单重置时清空。
+  function createArmDel() {
+    var pending = null;
+    return {
+      arm: function (key) {
+        if (pending !== key) { pending = key; return false; }
+        pending = null; return true;
+      },
+      peek: function (key) { return pending === key; },
+      reset: function () { pending = null; }
+    };
+  }
+
   return {
     $: $, esc: esc, call: call, snapshot: snapshot, onUpdate: onUpdate,
     toast: toast, setReady: setReady, today: today, dateOf: dateOf,
-    dayDiff: dayDiff, start: start, broadcast: broadcast, isHA: isHA
+    dayDiff: dayDiff, start: start, broadcast: broadcast, isHA: isHA,
+    bindDateFields: bindDateFields, createLoader: createLoader, createArmDel: createArmDel
   };
 })();
