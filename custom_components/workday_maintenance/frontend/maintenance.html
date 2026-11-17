@@ -58,10 +58,10 @@
 
 <div class="modal-mask" id="importMask" hidden>
   <div class="modal" role="dialog" aria-modal="true" aria-labelledby="importTitle">
-    <div class="modal-head"><b id="importTitle">导入项目与小项</b>
+    <div class="modal-head"><b id="importTitle">导入数据</b>
       <button class="ghost" id="importClose" aria-label="关闭">×</button></div>
     <div class="modal-body">
-      <div class="hint">粘贴 JSON（可一次导入多个项目，用数组包裹）。字段：name 必填；slug / need_counter / counter_unit / counter_label 可选；items 每项含 name、interval_days、interval_counter（可省）、note（可省）。下面预填了一份卡罗拉保养示例，可直接导入或替换成自己的清单。</div>
+      <div class="hint">粘贴「导出全部数据」生成的 JSON 即可完整恢复（项目、小项、维护记录原样还原）。也兼容旧格式：单个项目对象或项目数组，字段 name 必填。<b>同名 slug 的项目会跳过，不会覆盖</b>——恢复前请先删除同名项目。</div>
       <div><textarea id="importText" rows="10">{
   "name": "卡罗拉1.2T",
   "need_counter": true,
@@ -311,10 +311,9 @@
   function closeProjMenu() { $('pmMenu').hidden = true; }
   function openProjMenu(btn) {
     var el = $('pmMenu');
-    var has = !!project();
     el.innerHTML = '<button data-menu-act="new">新建项目</button>' +
       '<button data-menu-act="import">导入项目与小项</button>' +
-      (has ? '<button data-menu-act="export">导出当前项目 (.md)</button>' : '');
+      '<button data-menu-act="export">导出全部数据 (.json)</button>';
     var r = btn.getBoundingClientRect();
     el.hidden = false;
     var left = Math.max(8, Math.min(r.left, window.innerWidth - el.offsetWidth - 8));
@@ -324,17 +323,17 @@
     el.style.top = Math.round(top) + 'px';
   }
   function exportCurrent() {
-    var p = project(); if (!p) return;
-    M.call('export_markdown', { slug: p.slug }, true).then(function (res) {
-      var md = res && (res.markdown || (res.service_response && res.service_response.markdown));
-      if (!md) { M.toast('导出失败：没有拿到内容', true); return; }
-      var name = p.name.replace(/[\\/:*?"<>|]/g, '_');
-      var blob = new Blob([md], { type: 'text/markdown;charset=utf-8' });
+    M.call('export_all', {}, true).then(function (res) {
+      var json = res && (res.json || (res.service_response && res.service_response.json));
+      if (!json) { M.toast('导出失败：没有拿到内容', true); return; }
+      var d = new Date(), pad = function (x) { return x < 10 ? '0' + x : '' + x; };
+      var stamp = d.getFullYear() + pad(d.getMonth() + 1) + pad(d.getDate());
+      var blob = new Blob([json], { type: 'application/json;charset=utf-8' });
       var a = document.createElement('a');
-      a.href = URL.createObjectURL(blob); a.download = name + '.md';
+      a.href = URL.createObjectURL(blob); a.download = 'workday_maintenance_' + stamp + '.json';
       document.body.appendChild(a); a.click(); document.body.removeChild(a);
       setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
-      M.toast('已导出 ' + a.download);
+      M.toast('已导出全部数据 ' + a.download);
     }).catch(function (e) { M.toast('导出失败：' + e.message, true); });
   }
   function openImport() {
