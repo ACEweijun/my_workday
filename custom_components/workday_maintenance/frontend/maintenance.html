@@ -8,6 +8,7 @@
 </head>
 <body>
 <div id="msg" class="msg" hidden></div>
+<div class="proj-menu" id="pmMenu" hidden></div>
 
 <main class="mt-layout">
   <aside class="mt-side" id="projSide"></aside>
@@ -185,8 +186,7 @@
       return '<button class="tab' + (on ? ' on' : '') + '" data-tab="' + M.esc(p.slug) + '"' +
         (on ? ' title="再点一次编辑项目"' : ' title="切换到这个项目"') + '>' +
         M.esc(p.name) + (s.due_count ? '<span class="badge">' + s.due_count + '</span>' : '') + '</button>';
-    }).join('') + '<button class="tab add primary" id="projAdd">+ 新建</button>' +
-      '<button class="tab add" id="projImport">导入</button>';
+    }).join('') + '<button class="tab add primary" id="projPlus" title="新建 / 导入 / 导出">＋</button>';
   }
   function renderCounter() {
     var p = project();
@@ -307,6 +307,35 @@
     var h = 5381;
     for (var i = 0; i < name.length; i++) h = ((h * 33) ^ name.charCodeAt(i)) >>> 0;
     return 'p_' + h.toString(36);
+  }
+  function closeProjMenu() { $('pmMenu').hidden = true; }
+  function openProjMenu(btn) {
+    var el = $('pmMenu');
+    var has = !!project();
+    el.innerHTML = '<button data-menu-act="new">新建项目</button>' +
+      '<button data-menu-act="import">导入项目与小项</button>' +
+      (has ? '<button data-menu-act="export">导出当前项目 (.md)</button>' : '');
+    var r = btn.getBoundingClientRect();
+    el.hidden = false;
+    var left = Math.max(8, Math.min(r.left, window.innerWidth - el.offsetWidth - 8));
+    var top = r.bottom + 4 + el.offsetHeight > window.innerHeight - 8
+      ? Math.max(8, r.top - el.offsetHeight - 4) : r.bottom + 4;
+    el.style.left = Math.round(left) + 'px';
+    el.style.top = Math.round(top) + 'px';
+  }
+  function exportCurrent() {
+    var p = project(); if (!p) return;
+    M.call('export_markdown', { slug: p.slug }, true).then(function (res) {
+      var md = res && (res.markdown || (res.service_response && res.service_response.markdown));
+      if (!md) { M.toast('导出失败：没有拿到内容', true); return; }
+      var name = p.name.replace(/[\\/:*?"<>|]/g, '_');
+      var blob = new Blob([md], { type: 'text/markdown;charset=utf-8' });
+      var a = document.createElement('a');
+      a.href = URL.createObjectURL(blob); a.download = name + '.md';
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
+      M.toast('已导出 ' + a.download);
+    }).catch(function (e) { M.toast('导出失败：' + e.message, true); });
   }
   function openImport() {
     resetForms();
@@ -498,10 +527,8 @@
   }
 
   $('projSide').onclick = function (e) {
-    var imp = e.target.closest && e.target.closest('#projImport');
-    if (imp) { openImport(); return; }
-    var add = e.target.closest && e.target.closest('#projAdd');
-    if (add) { openForm(false); return; }
+    var plus = e.target.closest && e.target.closest('#projPlus');
+    if (plus) { openProjMenu(plus); return; }
     var t = e.target.closest && e.target.closest('[data-tab]'); if (!t) return;
     var target = t.dataset.tab;
     if (target === slug) { openForm(true); return; }
@@ -515,6 +542,19 @@
   $('importSave').onclick = submitImport;
   $('importClose').onclick = resetForms;
   $('importCancel').onclick = resetForms;
+  document.addEventListener('click', function (e) {
+    var el = $('pmMenu'); if (el.hidden) return;
+    var it = e.target.closest && e.target.closest('[data-menu-act]');
+    if (it) {
+      var act = it.dataset.menuAct; closeProjMenu();
+      if (act === 'new') openForm(false);
+      else if (act === 'import') openImport();
+      else if (act === 'export') exportCurrent();
+      return;
+    }
+    if (e.target.closest && e.target.closest('#projPlus')) return;
+    closeProjMenu();
+  });
   $('counterValue').onchange = function () {
     var p = project(); if (!p) return;
     var raw = String($('counterValue').value == null ? '' : $('counterValue').value).trim();
@@ -579,7 +619,7 @@
     $(id).onclick = function (e) { if (e.target === this) hideModals(); };
   });
   document.addEventListener('keydown', function (e) {
-    if (e.key === 'Escape') hideModals();
+    if (e.key === 'Escape') { hideModals(); closeProjMenu(); }
   });
   M.onUpdate(load);
   M.start();
