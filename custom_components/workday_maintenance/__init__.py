@@ -108,7 +108,9 @@ class FrontendFileView(HomeAssistantView):
         content = _FRONTEND_CACHE["static"].get(filename)
         if content is None:
             raise web.HTTPNotFound()
-        return web.Response(body=content, headers=headers)
+        # 必须显式给 MIME 类型：浏览器会拒绝把 application/octet-stream 当 CSS/JS 加载。
+        mime = "text/css" if filename.endswith(".css") else "application/javascript"
+        return web.Response(body=content, content_type=mime, headers=headers)
 
 
 @websocket_api.websocket_command({"type": "workday_maintenance/snapshot"})
