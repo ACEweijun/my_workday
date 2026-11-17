@@ -83,6 +83,27 @@ class TestWorkday(unittest.TestCase):
         self.assertIn('2026-01-01', parsed['off'])
         self.assertIn('2026-02-07', parsed['makeup'])
 
+    def test_holiday_payload_new_holiday_cn_format(self):
+        """holiday-cn 新版 days 列表格式也应正确解析。"""
+        payload = {'year': 2027, 'days': [
+            {'name': '元旦', 'date': '2027-01-01', 'isOffDay': True},
+            {'name': '补班', 'date': '2027-01-04', 'isOffDay': False},
+        ]}
+        parsed = wd.holiday_payload_to_holidays(payload, 2027)
+        self.assertIn('2027-01-01', parsed['off'])
+        self.assertIn('2027-01-04', parsed['makeup'])
+
+    def test_holiday_snapshot_exists_and_parses(self):
+        """内置节假日快照必须存在且能解析出数据（网络全失败的兜底）。"""
+        snapshot_dir = PKG / 'holidays_snapshot'
+        for year in (2026, 2027):
+            p = snapshot_dir / f'{year}.json'
+            self.assertTrue(p.is_file(), f'缺少内置快照 {year}.json')
+            payload = json.loads(p.read_text(encoding='utf-8'))
+            parsed = wd.holiday_payload_to_holidays(payload, year)
+            self.assertGreater(len(parsed['off']), 0, f'{year} 快照解析无放假日期')
+            self.assertGreater(len(parsed['makeup']), 0, f'{year} 快照解析无补班日期')
+
     def test_next_holiday(self):
         self.h['off'].update({'2026-12-25', '2026-12-26'})
         self.h['names']['2026-12-25'] = '圣诞'
