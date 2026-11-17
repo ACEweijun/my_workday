@@ -273,6 +273,12 @@
           }
         }
         break;
+      case 'export_all': {
+        var data2 = { format: 'workday_maintenance', version: 1,
+          exported_at: TODAY, projects: (m.projects || []).map(function (x) { return JSON.parse(JSON.stringify(x)); }) };
+        result = { json: JSON.stringify(data2, null, 2) };
+        break;
+      }
       case 'export_markdown': {
         var pe = findProject(data.slug);
         if (pe) {
@@ -298,6 +304,7 @@
       case 'import_projects': {
         var list = [];
         try { list = JSON.parse(data.json || data.projects || '[]'); } catch (e) {}
+        if (list && !Array.isArray(list) && Array.isArray(list.projects)) list = list.projects;
         if (!Array.isArray(list)) list = [];
         var imp = { added: [], errors: [] };
         list.forEach(function (pr) {
@@ -308,7 +315,7 @@
           if (m.projects.some(function (x) { return x.slug === pslug; })) { imp.errors.push('项目标识已存在：' + pslug); return; }
           var newItems = (pr.items || []).map(function (it, idx) {
             it = it || {};
-            return { id: 'i' + idx + Date.now().toString(36), name: it.name || ('小项' + (idx + 1)),
+            return { id: it.id || ('i' + idx + Date.now().toString(36)), name: it.name || ('小项' + (idx + 1)),
               interval_days: (it.interval_days === '' || it.interval_days == null) ? null : Number(it.interval_days),
               interval_counter: (it.interval_counter === '' || it.interval_counter == null) ? null : Number(it.interval_counter),
               last_date: it.last_date || null,
@@ -316,12 +323,25 @@
               note: it.note || '' };
           });
           var newHist = [];
-          newItems.forEach(function (it) {
-            if (it.last_date) newHist.push({ id: 'r' + Date.now().toString(36) + it.id,
-              date: it.last_date, counter: it.last_counter,
-              entries: [{ item_id: it.id, note: it.note || '' }] });
-          });
-          newHist.sort(function (a, b) { return a.date.localeCompare(b.date); });
+          if (Array.isArray(pr.history) && pr.history.length) {
+            pr.history.forEach(function (hr, hi) {
+              hr = hr || {};
+              newHist.push({ id: hr.id || ('r' + Date.now().toString(36) + hi),
+                date: hr.date || TODAY,
+                counter: (hr.counter === '' || hr.counter == null) ? null : Number(hr.counter),
+                entries: (hr.entries || []).map(function (e) {
+                  return { item_id: String(e.item_id || ''), note: String(e.note || '') };
+                }) });
+            });
+            newHist.sort(function (a, b) { return String(a.date).localeCompare(String(b.date)); });
+          } else {
+            newItems.forEach(function (it) {
+              if (it.last_date) newHist.push({ id: 'r' + Date.now().toString(36) + it.id,
+                date: it.last_date, counter: it.last_counter,
+                entries: [{ item_id: it.id, note: it.note || '' }] });
+            });
+            newHist.sort(function (a, b) { return a.date.localeCompare(b.date); });
+          }
           m.projects.push({
             slug: pslug, name: pname, type: pr.type || 'custom',
             need_counter: !!pr.need_counter,
