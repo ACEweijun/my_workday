@@ -505,7 +505,8 @@ class TestRepo(unittest.TestCase):
         self.assertIn('id="pmMenu"', m)
         self.assertNotIn('id="projAdd"', m)
         self.assertNotIn('id="projImport"', m)
-        self.assertIn("M.call('export_markdown'", m)
+        self.assertIn("M.call('export_all'", m)
+        self.assertIn("导出全部数据 (.json)", m)
         self.assertIn("data-menu-act=\"export\"", m)
         css = (PKG / 'frontend' / 'shared.css').read_text(encoding='utf-8')
         self.assertIn('.proj-menu', css)
@@ -514,6 +515,8 @@ class TestRepo(unittest.TestCase):
         init = (PKG / '__init__.py').read_text(encoding='utf-8')
         self.assertIn('async def import_projects', init)
         self.assertIn('proj["history"] = histories', init)
+        self.assertIn('isinstance(p.get("history"), list)', init)  # 全量 history 原样还原
+        self.assertIn('it.get("id")', init)  # item id 原样保留
         self.assertIn('if isinstance(raw_projects, dict):', init)
         self.assertIn('(SERVICE_IMPORT_PROJECTS, import_projects)', init)
         sv = (PKG / 'services.yaml').read_text(encoding='utf-8')
