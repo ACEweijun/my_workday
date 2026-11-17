@@ -128,6 +128,30 @@ class TestMaintenance(unittest.TestCase):
         self.assertIsNone(item['last_date'])
         self.assertEqual(self.project['history'], [])
 
+    def test_zero_counter_base_ignores_mileage(self):
+        """里程基准为 0（没填/占位）时不应按里程误报到期，只按天数判断。"""
+        item = self.project['items'][0]
+        item['last_date'] = '2026-11-01'
+        item['interval_days'] = 365
+        item['last_counter'] = 0
+        item['interval_counter'] = 10000
+        self.project['counter'] = 43000
+        state = mnt.item_state(item, self.project, self.today, 7)
+        self.assertIsNone(state['remaining_counter'])  # 0 基准不参与里程判断
+        self.assertEqual(state['status'], 'ok')        # 天数还剩很多 -> 正常，不误报
+
+    def test_real_counter_base_still_applies(self):
+        """填了真实里程（>0）时，里程判断照常生效。"""
+        item = self.project['items'][0]
+        item['last_date'] = '2026-11-01'
+        item['interval_days'] = 365
+        item['last_counter'] = 40000
+        item['interval_counter'] = 10000
+        self.project['counter'] = 82000
+        state = mnt.item_state(item, self.project, self.today, 7)
+        self.assertEqual(state['remaining_counter'], 40000 + 10000 - 82000)  # -32000
+        self.assertEqual(state['status'], 'due')  # 里程已超 -> 到期
+
     def test_summary_counts(self):
         item = self.project['items'][0]
         item['last_date'] = '2026-11-01'
