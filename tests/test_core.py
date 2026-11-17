@@ -499,6 +499,17 @@ class TestRepo(unittest.TestCase):
         # 距离卡片：只显示名称，日期移到 title
         self.assertIn("M.esc(ev.name) + '</div>'", w)
 
+    def test_project_plus_menu_and_export(self):
+        m = (PKG / 'frontend' / 'maintenance.html').read_text(encoding='utf-8')
+        self.assertIn('id="projPlus"', m)
+        self.assertIn('id="pmMenu"', m)
+        self.assertNotIn('id="projAdd"', m)
+        self.assertNotIn('id="projImport"', m)
+        self.assertIn("M.call('export_markdown'", m)
+        self.assertIn("data-menu-act=\"export\"", m)
+        css = (PKG / 'frontend' / 'shared.css').read_text(encoding='utf-8')
+        self.assertIn('.proj-menu', css)
+
     def test_import_projects_interface(self):
         init = (PKG / '__init__.py').read_text(encoding='utf-8')
         self.assertIn('async def import_projects', init)
@@ -511,7 +522,7 @@ class TestRepo(unittest.TestCase):
         self.assertIn("M.call('import_projects', { json: text }, true)", m)
         self.assertIn('id="importMask"', m)
         self.assertIn('id="importText"', m)
-        self.assertIn('id="projImport"', m)
+        self.assertIn('id="projPlus"', m)
 
     def test_delete_labels_are_explicit(self):
         m = (PKG / 'frontend' / 'maintenance.html').read_text(encoding='utf-8')
