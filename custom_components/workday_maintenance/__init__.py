@@ -37,18 +37,55 @@ from .coordinator import MergedCoordinator
 _LOGGER = logging.getLogger(__name__)
 
 
+# 前端静态资源缓存：启动阶段一次性异步读入内存，避免事件循环内同步 IO。
+_FRONTEND_CACHE: dict = {"version": "0", "html": {}, "static": {}}
+
+
 def _frontend_version() -> str:
-    """返回集成版本号（manifest.json），用于前端静态资源缓存破坏。"""
-    try:
-        return json.loads(
-            (Path(__file__).parent / "manifest.json").read_text(encoding="utf-8")
-        ).get("version", "0")
-    except Exception:  # noqa: BLE001
-        return "0"
+    """返回缓存的集成版本号（启动阶段预热），用于前端缓存破坏。"""
+    return _FRONTEND_CACHE.get("version", "0")
 
 
 PLATFORMS = [Platform.SENSOR, Platform.BINARY_SENSOR, Platform.CALENDAR]
-_FRONTEND_FILES = frozenset({"workday.html", "maintenance.html", "shared.js", "shared.css"})
+# demo-data.js 也在页面中被引用：本地预览时提供虚拟数据，HA 下脚本自检测失效。
+# 必须放进白名单，否则 HA 会返回 404 并在浏览器控制台报错。
+_FRONTEND_FILES = frozenset({
+    "workday.html", "maintenance.html", "shared.js", "shared.css", "demo-data.js",
+})
+
+
+def _load_frontend_cache() -> dict:
+    """在线程池执行：读 manifest 与前端文件，预生成注入版本号后的 HTML。"""
+    base = Path(__file__).parent
+    try:
+        version = json.loads(
+            (base / "manifest.json").read_text(encoding="utf-8")
+        ).get("version", "0")
+    except Exception:  # noqa: BLE001
+        version = "0"
+    html, static = {}, {}
+    for filename in _FRONTEND_FILES:
+        path = base / "frontend" / filename
+        if not path.is_file():
+            continue
+        if filename.endswith(".html"):
+            text = path.read_text(encoding="utf-8")
+            for asset in ("shared.css", "shared.js"):
+                text = text.replace('="' + asset + '"',
+                                    '="' + asset + '?v=' + version + '"')
+            html[filename] = text
+        else:
+            static[filename] = path.read_bytes()
+    return {"version": version, "html": html, "static": static}
+
+
+async def _async_warm_frontend_cache(hass: HomeAssistant) -> None:
+    """启动时预热前端缓存（文件读取放到线程池）。"""
+    try:
+        loaded = await hass.async_add_executor_job(_load_frontend_cache)
+        _FRONTEND_CACHE.update(loaded)
+    except Exception as err:  # noqa: BLE001
+        _LOGGER.warning("前端缓存预热失败，页面可能不可用：%s", err)
 
 
 class FrontendFileView(HomeAssistantView):
@@ -59,23 +96,19 @@ class FrontendFileView(HomeAssistantView):
     async def get(self, request, filename):
         if filename not in _FRONTEND_FILES:
             raise web.HTTPNotFound()
-        path = Path(__file__).parent / "frontend" / filename
-        if not path.is_file():
-            raise web.HTTPNotFound()
-        # 静态资源一律协商缓存：文件变了浏览器立刻能发现，不再拿旧缓存。
+        # 全部从启动阶段预热的缓存读取，事件循环内无同步文件 IO。
         headers = {"Cache-Control": "no-cache"}
         if filename.endswith(".html"):
-            # HTML 内的 css/js 引用带上版本号，改版后 URL 变化强制重新下载。
-            text = path.read_text(encoding="utf-8")
-            v = _frontend_version()
-            for asset in ("shared.css", "shared.js"):
-                text = text.replace(
-                    '="' + asset + '"', '="' + asset + '?v=' + v + '"'
-                )
+            text = _FRONTEND_CACHE["html"].get(filename)
+            if text is None:
+                raise web.HTTPNotFound()
             return web.Response(
                 text=text, content_type="text/html", headers=headers
             )
-        return web.FileResponse(path, headers=headers)
+        content = _FRONTEND_CACHE["static"].get(filename)
+        if content is None:
+            raise web.HTTPNotFound()
+        return web.Response(body=content, headers=headers)
 
 
 @websocket_api.websocket_command({"type": "workday_maintenance/snapshot"})
@@ -88,7 +121,9 @@ async def _ws_snapshot(hass: HomeAssistant, connection, msg) -> None:
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+    await _async_warm_frontend_cache(hass)
     coordinator = MergedCoordinator(hass, entry)
+    await coordinator.async_warm_snapshots()
     await coordinator.async_config_entry_first_refresh()
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = coordinator
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
@@ -104,6 +139,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     )
     entry.async_on_unload(entry.add_update_listener(_options_updated))
     _async_register_services(hass, coordinator)
+    # WebSocket 命令按 handler 名做幂等注册；标志在卸载时清理，保证重新加载后可再次注册。
     if not hass.data.get(f"{DOMAIN}_ws"):
         websocket_api.async_register_command(hass, _ws_snapshot)
         hass.data[f"{DOMAIN}_ws"] = True
@@ -124,6 +160,8 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             for name in list(hass.services.async_services().get(DOMAIN, {})):
                 hass.services.async_remove(DOMAIN, name)
             _async_remove_panels(hass)
+            # 清理全局标志：下次加载时重新走 WS 注册，避免标志残留导致跳过注册。
+            hass.data.pop(f"{DOMAIN}_ws", None)
     return unloaded
 
 
@@ -547,12 +585,12 @@ def _async_register_services(hass: HomeAssistant, coordinator: MergedCoordinator
         """导出全部项目（含所有小项与完整维护记录），格式与 import_projects 对称。"""
         raw = await coordinator.store.async_load()
         projects = (raw.get("maintenance") or {}).get("projects") or []
-        # 原样导出项目完整字段；只做浅拷贝避免改动内存数据。
+        # 深拷贝：items/history 是嵌套结构，浅拷贝会在并发写入时导出不一致快照。
         data = {
             "format": "workday_maintenance",
             "version": 1,
             "exported_at": _today().isoformat(),
-            "projects": [dict(p) for p in projects],
+            "projects": json.loads(json.dumps(projects, ensure_ascii=False)),
         }
         return {"json": json.dumps(data, ensure_ascii=False, indent=2)}
 
