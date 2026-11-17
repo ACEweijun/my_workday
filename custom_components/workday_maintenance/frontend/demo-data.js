@@ -276,8 +276,21 @@
         }
         break;
       case 'export_all': {
-        var data2 = { format: 'workday_maintenance', version: 1,
-          exported_at: TODAY, projects: (m.projects || []).map(function (x) { return JSON.parse(JSON.stringify(x)); }) };
+        var data2 = { format: 'workday_maintenance', version: 2,
+          exported_at: TODAY,
+          _说明: { 用途: '完整数据存档，发给 AI 编辑后可原样导入恢复。',
+                   导入: '维护台账 -> 加号 -> 导入，整段粘贴；同名项目跳过，恢复前请先删除。',
+                   workday: '待办、纪念日、自定义班休、整年覆盖',
+                   'maintenance.projects': '维护项目（含 items 小项与 history 历史）' },
+          workday: {
+            todos: JSON.parse(JSON.stringify(SNAP.workday.todos || [])),
+            anniversaries: JSON.parse(JSON.stringify(SNAP.workday.anniversaries || [])),
+            custom_work: (SNAP.workday.custom_work || []).slice(),
+            custom_rest: (SNAP.workday.custom_rest || []).slice(),
+            year_override: JSON.parse(JSON.stringify(SNAP.workday.year_override || {}))
+          },
+          maintenance: { projects: (m.projects || []).map(function (x) { return JSON.parse(JSON.stringify(x)); }) }
+        };
         result = { json: JSON.stringify(data2, null, 2) };
         break;
       }
@@ -306,9 +319,21 @@
       case 'import_projects': {
         var list = [];
         try { list = JSON.parse(data.json || data.projects || '[]'); } catch (e) {}
-        if (list && !Array.isArray(list) && Array.isArray(list.projects)) list = list.projects;
+        var wdArchive = null;
+        if (list && !Array.isArray(list) && (list.workday || list.maintenance)) {
+          wdArchive = list.workday || {};
+          list = (list.maintenance && list.maintenance.projects) || [];
+        } else if (list && !Array.isArray(list) && Array.isArray(list.projects)) list = list.projects;
         if (!Array.isArray(list)) list = [];
         var imp = { added: [], errors: [] };
+        if (wdArchive) {
+          ['custom_work','custom_rest','todos','anniversaries'].forEach(function (k) {
+            if (Array.isArray(wdArchive[k])) SNAP.workday[k] = JSON.parse(JSON.stringify(wdArchive[k]));
+          });
+          if (wdArchive.year_override && typeof wdArchive.year_override === 'object')
+            SNAP.workday.year_override = JSON.parse(JSON.stringify(wdArchive.year_override));
+          imp.workday_restored = true;
+        }
         list.forEach(function (pr) {
           pr = pr || {};
           var pname = String(pr.name || '').trim();
