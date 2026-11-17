@@ -187,12 +187,20 @@ window.MW = (function () {
       setTimeout(function () { connect(); }, 5000);
     };
   }
+  var toastTimer = null;
   function toast(text, isErr) {
     var el = $('msg');
+    if (toastTimer) { clearTimeout(toastTimer); toastTimer = null; }
     if (!el) return;
     el.textContent = text || '';
     el.hidden = !text;
     el.className = 'msg' + (isErr ? ' err' : '');
+    // 自动消失：普通提示 2.5 秒，错误 4 秒；空文本立即隐藏无需定时器。
+    if (text) {
+      toastTimer = setTimeout(function () {
+        el.textContent = ''; el.hidden = true; toastTimer = null;
+      }, isErr ? 4000 : 2500);
+    }
   }
   function setReady(value) {
     ready = !!value;
