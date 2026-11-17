@@ -721,6 +721,13 @@ class TestRepo(unittest.TestCase):
         manifest = json.loads((PKG / 'manifest.json').read_text(encoding='utf-8'))
         self.assertIn('websocket_api', manifest['dependencies'])
 
+    def test_static_responses_set_correct_mime(self):
+        """静态资源必须带正确 Content-Type，否则浏览器拒绝加载 CSS/JS（曾导致整页裸奔）。"""
+        init = (PKG / '__init__.py').read_text(encoding='utf-8')
+        self.assertIn('mime = "text/css" if filename.endswith(".css")', init)
+        self.assertIn('else "application/javascript"', init)
+        self.assertIn('content_type=mime', init)
+
     def test_add_modal_type_switch(self):
         w = (PKG / 'frontend' / 'workday.html').read_text(encoding='utf-8')
         for token in ('openAddForm(date,', "openAddForm(S.today, 'todo')",
