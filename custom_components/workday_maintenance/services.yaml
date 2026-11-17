@@ -286,3 +286,7 @@ export_markdown:
 sync_maintenance_todos:
   name: "同步维护到期为待办"
   description: "把已到期与快到期的维护项写成 [维护] 前缀的待办，重复调用会先清掉旧的同步项。"
+
+export_all:
+  name: "导出全部数据"
+  description: "导出全部项目（含所有小项与完整维护记录）为 JSON，格式与 import_projects 导入相同，可直接用于备份/恢复。"
