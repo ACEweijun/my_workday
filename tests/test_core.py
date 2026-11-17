@@ -208,6 +208,41 @@ class TestRepo(unittest.TestCase):
                                  (PKG / 'services.yaml').read_text(encoding='utf-8'), re.M))
         self.assertEqual(declared, defined)
 
+    def test_handlers_register_every_declared_service(self):
+        """结构化契约：handlers 元组必须覆盖 const 里声明的每个服务，且无遗漏文档。"""
+        c = (PKG / 'const.py').read_text(encoding='utf-8')
+        init = (PKG / '__init__.py').read_text(encoding='utf-8')
+        svc = (PKG / 'services.yaml').read_text(encoding='utf-8')
+        declared = dict(re.findall(r'^SERVICE_([A-Z_]+)\s*=\s*"([^"]+)"', c, re.M))
+        doc = set(re.findall(r'^([a-z_]+):\s*$', svc, re.M))
+        # 从 handlers 元组里提取实际注册的常量名
+        registered = set(re.findall(r'\(SERVICE_([A-Z_]+),\s*\w+\)', init))
+        self.assertEqual(set(declared), registered,
+                         '服务常量与 handlers 注册不一致')
+        self.assertEqual(set(declared.values()), doc,
+                         '服务实现与 services.yaml 文档不一致')
+
+    def test_all_entity_ids_well_formed(self):
+        """结构化契约：所有 ENTITY_* 常量必须是合法 HA 实体 ID 且平台前缀正确。"""
+        c = (PKG / 'const.py').read_text(encoding='utf-8')
+        ids = re.findall(r'^ENTITY_[A-Z_]+\s*=\s*"([^"]+)"', c, re.M)
+        self.assertGreater(len(ids), 5)
+        for eid in ids:
+            self.assertRegex(eid, r'^(sensor|binary_sensor|calendar)\.workday_maintenance[a-z0-9_]*$',
+                             f'实体 ID 格式异常：{eid}')
+        self.assertEqual(len(ids), len(set(ids)), '实体 ID 有重复')
+
+    def test_entity_ids_referenced_by_platforms(self):
+        """每个实体 ID 常量都应被对应平台文件真正使用。"""
+        c = (PKG / 'const.py').read_text(encoding='utf-8')
+        pairs = re.findall(r'^(ENTITY_[A-Z_]+)\s*=\s*"([^"]+)"', c, re.M)
+        platforms = ''.join(
+            (PKG / f).read_text(encoding='utf-8')
+            for f in ('sensor.py', 'binary_sensor.py', 'calendar.py')
+        )
+        for const_name, _eid in pairs:
+            self.assertIn(const_name, platforms, f'{const_name} 未被任何平台使用')
+
     def test_two_pages_share_layer(self):
         for page in ('workday.html', 'maintenance.html'):
             html = (PKG / 'frontend' / page).read_text(encoding='utf-8')
@@ -232,11 +267,15 @@ class TestRepo(unittest.TestCase):
         for token in ('setReady', 'installGuards', 'beforeunload',
                       "addEventListener('click', guard, true)"):
             self.assertIn(token, shared)
+        # 加载骨架已抽到 shared.js 的 createLoader；页面只需调用它。
+        self.assertIn('function createLoader', shared)
+        self.assertIn('api.setReady(true)', shared)
+        self.assertIn('api.setReady(false)', shared)
+        self.assertIn('retryLoad()', shared)
         for page in ('workday.html', 'maintenance.html'):
             html = (PKG / 'frontend' / page).read_text(encoding='utf-8')
-            self.assertIn('M.setReady(true)', html)
-            self.assertIn('M.setReady(false)', html)
-            self.assertIn('retryLoad()', html)
+            self.assertIn('M.createLoader(', html)
+            self.assertIn('function load() { return loader.load(); }', html)
 
     def test_project_tab_reset(self):
         html = (PKG / 'frontend' / 'maintenance.html').read_text(encoding='utf-8')
@@ -529,12 +568,14 @@ class TestRepo(unittest.TestCase):
         self.assertIn('.rec-name', css)
 
     def test_date_picker_whole_row_clickable(self):
+        # 整行点击逻辑已集中在 shared.js 的 bindDateFields；页面只调用它。
+        shared = (PKG / 'frontend' / 'shared.js').read_text(encoding='utf-8')
+        self.assertIn('if (typeof el.showPicker ===', shared)
+        self.assertNotIn('if (e.target === el) return;', shared)
+        self.assertNotIn("el.addEventListener('click', open)", shared)
         for f in ('workday.html', 'maintenance.html'):
             html = (PKG / 'frontend' / f).read_text(encoding='utf-8')
-            # 点输入框本身 / 标签 / 整行都触发 showPicker（去掉 input 跳过判断）
-            self.assertNotIn("el.addEventListener('click', open)", html)
-            self.assertNotIn('if (e.target === el) return;', html)
-            self.assertIn('if (typeof el.showPicker ===', html)
+            self.assertIn('M.bindDateFields()', html)
 
     def test_workday_stat_labels_simplified(self):
         w = (PKG / 'frontend' / 'workday.html').read_text(encoding='utf-8')
@@ -631,10 +672,15 @@ class TestRepo(unittest.TestCase):
         self.assertIn("histOpen ? '▾' : '▸'", m)
 
     def test_date_field_picker_indicator(self):
+        # bindDateFields 已抽到 shared.js；页面只需调用公共助手。
+        shared = (PKG / 'frontend' / 'shared.js').read_text(encoding='utf-8')
+        self.assertIn('function bindDateFields', shared)
+        self.assertIn('el.showPicker()', shared)
+        self.assertNotIn('if (e.target === el) return;', shared)
         for f in ('workday.html', 'maintenance.html'):
             h = (PKG / 'frontend' / f).read_text(encoding='utf-8')
-            self.assertNotIn('if (e.target === el) return;', h)
-            self.assertIn('el.showPicker()', h)
+            self.assertIn('M.bindDateFields()', h)
+            self.assertNotIn('function bindDateFields', h)
         css = (PKG / 'frontend' / 'shared.css').read_text(encoding='utf-8')
         self.assertIn('::-webkit-calendar-picker-indicator', css)
         self.assertIn('width:100%;height:100%', css)
