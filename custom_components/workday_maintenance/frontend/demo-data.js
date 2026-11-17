@@ -71,7 +71,9 @@
     var lastDate = item.last_date, intervalDays = item.interval_days, remainingDays = null;
     if (lastDate && intervalDays) remainingDays = Number(intervalDays) - dayDiff(TODAY, lastDate);
     var counter = project.counter, lastCounter = item.last_counter, intervalCounter = item.interval_counter, remainingCounter = null;
-    if (project.need_counter && counter != null && lastCounter != null && intervalCounter)
+    // 里程基准须 > 0：0 通常是没填/占位，按 0 算会误报到期。填了真实里程后自动恢复判断。
+    var hasCounterBase = lastCounter != null && lastCounter !== '' && Number(lastCounter) > 0;
+    if (project.need_counter && counter != null && hasCounterBase && intervalCounter)
       remainingCounter = Number(lastCounter) + Number(intervalCounter) - Number(counter);
     var status;
     if (!lastDate && lastCounter == null) status = 'unset';
