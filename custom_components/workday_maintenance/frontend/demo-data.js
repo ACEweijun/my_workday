@@ -273,6 +273,28 @@
           }
         }
         break;
+      case 'export_markdown': {
+        var pe = findProject(data.slug);
+        if (pe) {
+          var lines = ['# ' + pe.name, '', '当前' + (pe.counter_label || '计数') + '：' +
+            (pe.counter == null ? '—' : pe.counter) + ' ' + (pe.counter_unit || ''), '',
+            '| 维护小项 | 间隔天数 | 间隔计数 | 上次维护 | 备注 |', '|---|---|---|---|---|'];
+          pe.items.forEach(function (it) {
+            lines.push('| ' + it.name + ' | ' + (it.interval_days == null ? '—' : it.interval_days) +
+              ' | ' + (it.interval_counter == null ? '—' : it.interval_counter) + ' | ' +
+              (it.last_date || '—') + ' | ' + (it.note || '') + ' |');
+          });
+          lines.push('', '## 历史记录', '');
+          (pe.history || []).forEach(function (r) {
+            lines.push('- ' + r.date + ' · ' + (r.entries || []).map(function (en) {
+              var ei = (pe.items || []).filter(function (x) { return x.id === en.item_id; })[0];
+              return ei ? ei.name : en.item_id;
+            }).join('、'));
+          });
+          result = { markdown: lines.join('\n') };
+        } else { result = { markdown: '# 项目不存在' }; }
+        break;
+      }
       case 'import_projects': {
         var list = [];
         try { list = JSON.parse(data.json || data.projects || '[]'); } catch (e) {}
