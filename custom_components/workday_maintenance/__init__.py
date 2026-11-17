@@ -23,7 +23,7 @@ from . import workday as wd
 from .const import (
     DOMAIN, EVENT_UPDATED, MODE_AUTO, MODE_REST, MODE_WORK,
     PANEL_MAINTENANCE, PANEL_MAINTENANCE_PATH, PANEL_URL, PANEL_WORKDAY,
-    SCOPE_MAINTENANCE, SCOPE_WORKDAY, SERVICE_ADD_ITEM, SERVICE_ADD_PROJECT,
+    SCOPE_ALL, SCOPE_MAINTENANCE, SCOPE_WORKDAY, SERVICE_ADD_ITEM, SERVICE_ADD_PROJECT,
     SERVICE_CLEAR_CUSTOM, SERVICE_DELETE_ITEM, SERVICE_DELETE_PROJECT,
     SERVICE_DELETE_RECORD, SERVICE_EXPORT, SERVICE_EXPORT_ALL, SERVICE_GET_SNAPSHOT,
     SERVICE_LIST_PROJECTS, SERVICE_LOG_SERVICE, SERVICE_REFRESH,
@@ -350,18 +350,26 @@ def _async_register_services(hass: HomeAssistant, coordinator: MergedCoordinator
         return {"slug": slug, "name": name}
 
     async def import_projects(call: ServiceCall) -> dict:
-        """批量导入项目与小项：projects 数组或 json 字符串二选一。"""
-        raw_projects = call.data.get("projects")
+        """导入存档：v2 完整存档（workday+maintenance）或旧格式项目数组/单对象。"""
         text = str(call.data.get("json") or "").strip()
+        raw_projects = call.data.get("projects")
+        archive = None  # v2 完整存档里的 workday 部分
         if raw_projects is None and text:
             try:
-                raw_projects = json.loads(text)
+                parsed = json.loads(text)
             except ValueError as err:
                 raise HomeAssistantError(f"json 不是合法 JSON：{err}") from err
+            # v2 完整存档：顶层有 workday 或 maintenance 键
+            if isinstance(parsed, dict) and ("workday" in parsed or "maintenance" in parsed):
+                archive = (parsed.get("workday") or {}) if isinstance(parsed.get("workday"), dict) else {}
+                raw_projects = ((parsed.get("maintenance") or {}).get("projects")
+                                if isinstance(parsed.get("maintenance"), dict) else None) or []
+            else:
+                raw_projects = parsed
         if isinstance(raw_projects, dict):
             raw_projects = [raw_projects]
-        if not isinstance(raw_projects, list) or not raw_projects:
-            raise HomeAssistantError("需要提供 projects 数组或 json 字符串，且至少一个项目")
+        if not isinstance(raw_projects, list):
+            raw_projects = []
         added, errors = [], []
 
         def _num(v):
@@ -387,6 +395,13 @@ def _async_register_services(hass: HomeAssistant, coordinator: MergedCoordinator
             }
 
         def mutate(raw):
+            # v2 完整存档：先恢复工作日侧用户数据（覆盖式，存档即快照）。
+            if archive is not None:
+                for key in ("custom_work", "custom_rest", "todos", "anniversaries"):
+                    if isinstance(archive.get(key), list):
+                        raw["workday"][key] = archive[key]
+                if isinstance(archive.get("year_override"), dict):
+                    raw["workday"]["year_override"] = archive["year_override"]
             projects = raw["maintenance"]["projects"]
             for p in raw_projects:
                 p = p if isinstance(p, dict) else {}
@@ -444,8 +459,11 @@ def _async_register_services(hass: HomeAssistant, coordinator: MergedCoordinator
                 except Exception as err:  # noqa: BLE001
                     errors.append(f"{name or '?'}：{err}")
 
-        await coordinator.async_mutate(SCOPE_MAINTENANCE, mutate)
-        return {"added": added, "errors": errors}
+        await coordinator.async_mutate(SCOPE_ALL, mutate)
+        result = {"added": added, "errors": errors}
+        if archive is not None:
+            result["workday_restored"] = True
+        return result
 
     async def update_project(call: ServiceCall) -> dict:
         slug = str(call.data.get("slug") or "")
@@ -584,15 +602,40 @@ def _async_register_services(hass: HomeAssistant, coordinator: MergedCoordinator
         return {"markdown": mnt.export_markdown(project, _today(), coordinator.soon_days)}
 
     async def export_all(call: ServiceCall) -> dict:
-        """导出全部项目（含所有小项与完整维护记录），格式与 import_projects 对称。"""
+        """导出全部用户数据（工作日 + 维护台账）为规范化存档，与 import_projects 对称。"""
         raw = await coordinator.store.async_load()
+        wd_raw = raw.get("workday") or {}
         projects = (raw.get("maintenance") or {}).get("projects") or []
-        # 深拷贝：items/history 是嵌套结构，浅拷贝会在并发写入时导出不一致快照。
+        # 深拷贝：嵌套结构浅拷贝会在并发写入时导出不一致快照。
+        clone = lambda o: json.loads(json.dumps(o, ensure_ascii=False))
         data = {
             "format": "workday_maintenance",
-            "version": 1,
+            "version": 2,
             "exported_at": _today().isoformat(),
-            "projects": json.loads(json.dumps(projects, ensure_ascii=False)),
+            "_说明": {
+                "用途": "这是 workday_maintenance 的完整数据存档，可直接发回给 AI 编辑后重新导入。",
+                "导入": "维护台账 -> 加号 -> 导入，整段粘贴即可恢复；同名项目会跳过，恢复前请先删除同名项目。",
+                "workday": "工作日侧用户数据：待办、纪念日、自定义班休、整年覆盖。",
+                "maintenance.projects": "维护项目，每项含小项 items 与历史记录 history。",
+                "字段": {
+                    "todos[].date": "YYYY-MM-DD", "todos[].text": "待办内容", "todos[].done": "是否完成",
+                    "anniversaries[].date": "MM-DD 或 YYYY-MM-DD", "anniversaries[].repeat": "none/week/month/quarter/year",
+                    "custom_work / custom_rest": "手动标记上班/休息的日期数组 YYYY-MM-DD",
+                    "year_override": "年份 -> 放假安排文本（每行 日期 名称，'班'字表示补班）",
+                    "projects[].need_counter": "是否需要里程/次数计数", "projects[].counter": "当前计数",
+                    "items[].interval_days": "间隔天数", "items[].interval_counter": "间隔计数（里程）",
+                    "items[].last_date": "上次维护日期", "items[].last_counter": "上次维护时的计数",
+                    "history[].entries[]": "item_id + note，引用 items[].id",
+                },
+            },
+            "workday": {
+                "todos": clone(wd_raw.get("todos") or []),
+                "anniversaries": clone(wd_raw.get("anniversaries") or []),
+                "custom_work": clone(wd_raw.get("custom_work") or []),
+                "custom_rest": clone(wd_raw.get("custom_rest") or []),
+                "year_override": clone(wd_raw.get("year_override") or {}),
+            },
+            "maintenance": {"projects": clone(projects)},
         }
         return {"json": json.dumps(data, ensure_ascii=False, indent=2)}
 
