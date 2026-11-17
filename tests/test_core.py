@@ -706,5 +706,39 @@ class TestRepo(unittest.TestCase):
         self.assertIn('.item-meta-static{', css)
 
 
+class TestNewDaySensors(unittest.TestCase):
+    def test_entity_ids_declared(self):
+        c = const
+        self.assertEqual(c.ENTITY_TODAY_REST, 'binary_sensor.workday_maintenance_today_rest')
+        self.assertEqual(c.ENTITY_TODAY_DATE, 'sensor.workday_maintenance_today_date')
+        self.assertEqual(c.ENTITY_TODAY_WEEKDAY, 'sensor.workday_maintenance_today_weekday')
+
+    def test_binary_sensor_registers_rest(self):
+        b = (PKG / 'binary_sensor.py').read_text(encoding='utf-8')
+        self.assertIn('class TodayRestSensor', b)
+        self.assertIn('TodayRestSensor(coordinator, entry)', b)
+        self.assertIn('return not bool(self.wd.get("today_work"))', b)
+        self.assertIn('ENTITY_TODAY_REST', b)
+
+    def test_sensor_registers_date_and_weekday(self):
+        s = (PKG / 'sensor.py').read_text(encoding='utf-8')
+        self.assertIn('class TodayDateSensor', s)
+        self.assertIn('class TodayWeekdaySensor', s)
+        self.assertIn('TodayDateSensor(coordinator, entry)', s)
+        self.assertIn('TodayWeekdaySensor(coordinator, entry)', s)
+        self.assertIn('ENTITY_TODAY_DATE', s)
+        self.assertIn('ENTITY_TODAY_WEEKDAY', s)
+        self.assertIn('_WEEKDAY_CN', s)
+        self.assertIn('d.isoweekday()', s)
+
+    def test_weekday_mapping(self):
+        """星期映射应对 2026-11-17（周二）给出正确的中文与数字。"""
+        names = ("星期一", "星期二", "星期三", "星期四", "星期五", "星期六", "星期日")
+        d = dt.date(2026, 11, 17)
+        self.assertEqual(d.weekday(), 1)
+        self.assertEqual(names[d.weekday()], "星期二")
+        self.assertEqual(d.isoweekday(), 2)
+
+
 if __name__ == '__main__':
     unittest.main()
