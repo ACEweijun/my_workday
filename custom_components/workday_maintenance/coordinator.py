@@ -3,7 +3,9 @@ from __future__ import annotations
 
 import asyncio
 import datetime as dt
+import json
 import logging
+from pathlib import Path
 
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
@@ -14,7 +16,7 @@ from . import maintenance as mnt
 from . import workday as wd
 from .const import (
     CONF_HOLIDAY_URL, CONF_SOON_DAYS, DEFAULT_HOLIDAY_URL, DEFAULT_SOON_DAYS,
-    DOMAIN, EVENT_UPDATED, SCOPE_ALL,
+    DOMAIN, EVENT_UPDATED, HOLIDAY_FALLBACK_URLS, SCOPE_ALL,
 )
 from .store import MergedStore
 
@@ -42,6 +44,41 @@ class MergedCoordinator(DataUpdateCoordinator):
         template = self.entry.options.get(CONF_HOLIDAY_URL) or DEFAULT_HOLIDAY_URL
         return str(template).replace("{year}", str(year))
 
+    def _candidate_urls(self, year: int) -> list[str]:
+        """数据源候选：用户自定义优先，其次默认 jsdelivr，再走多源兜底。"""
+        custom = str(self.entry.options.get(CONF_HOLIDAY_URL) or "").strip()
+        urls = [custom] if custom else []
+        urls.append(DEFAULT_HOLIDAY_URL)
+        urls.extend(HOLIDAY_FALLBACK_URLS)
+        seen, out = set(), []
+        for tpl in urls:
+            if not tpl:
+                continue
+            url = str(tpl).replace("{year}", str(year))
+            if url not in seen:
+                seen.add(url)
+                out.append(url)
+        return out
+
+    @staticmethod
+    def _payload_has_data(payload, year: int) -> bool:
+        """确认解析结果非空，避免把"格式不对/空数据"当成成功。"""
+        parsed = wd.holiday_payload_to_holidays(payload, year)
+        return bool(parsed["off"] or parsed["makeup"]), parsed
+
+    def _load_snapshot(self, year: int) -> dict | None:
+        """读取打包在集成内的节假日快照（网络全失败时的最终兜底）。"""
+        try:
+            path = Path(__file__).parent / "holidays_snapshot" / f"{year}.json"
+            if not path.is_file():
+                return None
+            payload = json.loads(path.read_text(encoding="utf-8"))
+            ok, parsed = self._payload_has_data(payload, year)
+            return parsed if ok else None
+        except Exception as err:  # noqa: BLE001
+            _LOGGER.debug("读取 %s 年内置节假日快照失败：%s", year, err)
+            return None
+
     async def _ensure_holidays(self, raw: dict, now: dt.date) -> None:
         overrides = raw["workday"].get("year_override") or {}
         for year in (now.year, now.year + 1):
@@ -52,17 +89,35 @@ class MergedCoordinator(DataUpdateCoordinator):
                 continue
             if year in self._holidays:
                 continue
-            try:
-                session = async_get_clientsession(self.hass)
-                async with session.get(self._url(year), timeout=10) as resp:
-                    resp.raise_for_status()
-                    payload = await resp.json(content_type=None)
-                self._holidays[year] = wd.holiday_payload_to_holidays(payload, year)
-                self._sources[year] = "network"
-            except Exception as err:  # noqa: BLE001
-                self._holidays[year] = {"off": set(), "makeup": set(), "names": {}}
-                self._sources[year] = "fallback"
-                _LOGGER.warning("%s 年放假数据不可用，按周末规则降级：%s", year, err)
+            # 依次尝试各网络源，任一返回有效数据即用
+            session = async_get_clientsession(self.hass)
+            got = False
+            for url in self._candidate_urls(year):
+                try:
+                    async with session.get(url, timeout=8) as resp:
+                        resp.raise_for_status()
+                        payload = await resp.json(content_type=None)
+                    ok, parsed = self._payload_has_data(payload, year)
+                    if ok:
+                        self._holidays[year] = parsed
+                        self._sources[year] = "network"
+                        got = True
+                        break
+                except Exception as err:  # noqa: BLE001
+                    _LOGGER.debug("%s 年节假日源 %s 不可用：%s", year, url, err)
+            if got:
+                continue
+            # 网络全失败 -> 内置快照
+            snapshot = self._load_snapshot(year)
+            if snapshot:
+                self._holidays[year] = snapshot
+                self._sources[year] = "snapshot"
+                _LOGGER.info("%s 年放假数据使用内置快照", year)
+                continue
+            # 快照也没有 -> 周末规则降级
+            self._holidays[year] = {"off": set(), "makeup": set(), "names": {}}
+            self._sources[year] = "fallback"
+            _LOGGER.warning("%s 年放假数据全部来源不可用，按周末规则降级", year)
 
     def _holidays_for(self, year: int) -> dict:
         base = self._holidays.get(year) or {"off": set(), "makeup": set(), "names": {}}
