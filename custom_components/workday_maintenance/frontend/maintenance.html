@@ -205,11 +205,7 @@
       var st = stateOf(i.id);
       var recs = itemRecords(p, i.id);
       var open = !!itemOpen[i.id];
-      var last = recs[0] || null, lastNote = '';
-      if (last) {
-        var lastEntry = (last.entries || []).filter(function (x) { return x.item_id === i.id; })[0];
-        lastNote = lastEntry && lastEntry.note ? lastEntry.note : '';
-      }
+      var last = recs[0] || null;
       var meta;
       if (!last) {
         meta = '<div class="item-meta-static">暂无维护记录</div>';
@@ -218,7 +214,6 @@
         if (last.counter != null && last.counter !== '') {
           bits.push(M.esc(last.counter) + (p.need_counter ? ' ' + M.esc(p.counter_unit || '') : ''));
         }
-        if (lastNote) bits.push(M.esc(lastNote));
         meta = '<button class="ghost item-meta-toggle" data-rectoggle="' + M.esc(i.id) +
           '" title="点击展开维护记录">' + bits.join(' · ') + ' ' + (open ? '▴' : '▸') + '</button>';
       }
@@ -232,7 +227,6 @@
       return '<div class="mt-item st-' + M.esc(st.status || 'unset') + '"><div class="top item-title" data-item="' + M.esc(i.id) +
         '" title="点名称编辑小项 · 点空白处给它记一次新维护">' +
         '<b data-itemname title="点击编辑小项">' + M.esc(i.name) + '</b>' +
-        (i.note ? '<span class="item-note">' + M.esc(i.note) + '</span>' : '') +
         pill(st.status) + '</div>' +
         meta +
         (open && recHtml ? '<div class="sub-list item-records">' + recHtml + '</div>' : '') +
