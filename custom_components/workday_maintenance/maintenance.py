@@ -68,8 +68,18 @@ def item_state(item: dict, project: dict, today: dt.date, soon_days: int) -> dic
     last_counter = item.get("last_counter")
     interval_counter = item.get("interval_counter")
     remaining_counter = None
-    if project.get("need_counter") and counter is not None and last_counter is not None and interval_counter:
-        remaining_counter = int(last_counter) + int(interval_counter) - int(counter)
+    # 里程基准必须 > 0 才参与判断。last_counter=0 通常是"没填/占位"（没有车在 0 公里做保养），
+    # 若按 0 计算，0 + 间隔 - 当前里程 必然为负，导致只填了天数的小项被误报"已到期"。
+    # 用户后续在"记一次维护"里填了真实里程（>0）后，里程判断会自动恢复。
+    last_counter_num = None
+    if last_counter not in (None, ""):
+        try:
+            last_counter_num = int(last_counter)
+        except (ValueError, TypeError):
+            last_counter_num = None
+    has_counter_base = last_counter_num is not None and last_counter_num > 0
+    if project.get("need_counter") and counter is not None and has_counter_base and interval_counter:
+        remaining_counter = last_counter_num + int(interval_counter) - int(counter)
 
     if not last_date and last_counter is None:
         status = STATUS_UNSET
