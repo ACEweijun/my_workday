@@ -689,7 +689,7 @@ class TestRepo(unittest.TestCase):
     def test_item_own_records_clickable(self):
         m = (PKG / 'frontend' / 'maintenance.html').read_text(encoding='utf-8')
         for token in ('function itemRecords(', 'data-recitem=', 'item-records',
-                      'data-rectoggle=', 'itemOpen', 'class="item-note"',
+                      'data-rectoggle=', 'itemOpen',
                       'item-meta-toggle', "'上次 ' + M.esc(last.date)", '暂无维护记录',
                       'openRecForm(recordId, focusItem)', 'id="recFocus"',
                       '编辑这条维护记录', '移除这条记录', 'renderRecEntries(p, rec, focusItem)',
@@ -749,11 +749,18 @@ class TestRepo(unittest.TestCase):
                       'box-sizing:border-box', 'overflow:hidden'):
             self.assertIn(token, css)
 
-    def test_item_meta_shows_latest_record(self):
+    def test_item_notes_hidden_in_list(self):
+        """列表页不显示小项备注与最近维护备注（数据仍在，编辑弹窗可查看）。"""
         m = (PKG / 'frontend' / 'maintenance.html').read_text(encoding='utf-8')
         for token in ('var last = recs[0] || null', "'上次 ' + M.esc(last.date)",
-                      '暂无维护记录', 'item-meta-static', 'lastEntry'):
+                      '暂无维护记录', 'item-meta-static'):
             self.assertIn(token, m)
+        self.assertNotIn('lastEntry', m)
+        self.assertNotIn('lastNote', m)
+        self.assertNotIn('item-note', m)
+        # 备注输入仍保留在编辑弹窗里（数据可编辑）
+        self.assertIn("id=\"itemNote\"", m)
+        self.assertIn("data-renote=", m)
         self.assertNotIn('上次维护：', m)
         self.assertNotIn('var left = st.remaining_days', m)
         css = (PKG / 'frontend' / 'shared.css').read_text(encoding='utf-8')
