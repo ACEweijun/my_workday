@@ -76,6 +76,22 @@ def holiday_payload_to_holidays(payload, year: int) -> dict:
     names: dict[str, str] = {}
     if not isinstance(payload, dict):
         return {"off": off, "makeup": makeup, "names": names}
+    # 新版 holiday-cn 格式：{"year": 2027, "days": [{"name","date","isOffDay"}, ...]}
+    # 先识别并归一化成旧格式 {年: {日期: {name, isOffDay}}}，再走下面的通用解析。
+    if "days" in payload and isinstance(payload["days"], list):
+        y = int(str(payload.get("year") or year)[:4])
+        by_date: dict[str, dict] = {}
+        for row in payload["days"]:
+            if not isinstance(row, dict):
+                continue
+            date = str(row.get("date") or "")[:10]
+            if not date:
+                continue
+            by_date[date] = {
+                "name": str(row.get("name") or ""),
+                "isOffDay": bool(row.get("isOffDay")),
+            }
+        payload = {str(y): by_date}
     for year_key, days in payload.items():
         if not isinstance(days, dict):
             continue
