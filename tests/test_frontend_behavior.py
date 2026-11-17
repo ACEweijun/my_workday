@@ -115,7 +115,8 @@ class TestFrontendBehavior(unittest.TestCase):
               await M.call('import_projects',{json:seed},true);
               const exp=(await M.call('export_all',{},true)).service_response.json;
               const parsed=JSON.parse(exp);
-              const p=parsed.projects.find(x=>x.slug==='test_car');
+              const projects = parsed.maintenance ? parsed.maintenance.projects : parsed.projects;
+              const p=projects.find(x=>x.slug==='test_car');
               const ok=p&&p.items[0].id==='i_oil'&&p.history[0].id==='r_oil'&&
                        p.history[0].entries[0].note==='4S店'&&p.counter===100;
               console.log(ok?'OK':'FAIL');
@@ -135,6 +136,29 @@ class TestFrontendBehavior(unittest.TestCase):
               const s=await M.snapshot();
               const sm=s.maintenance.summaries.find(x=>x.slug==='z');
               console.log(sm.items[0].status==='ok'?'OK':'FAIL '+sm.items[0].status);
+            })().catch(e=>console.log('ERR '+e.message));
+        '''
+        self.assertIn('OK', self.run_node(script))
+
+    def test_full_archive_v2_roundtrip(self):
+        """v2 完整存档：导出含 workday+maintenance+说明，改后导入完整恢复。"""
+        script = self._env_setup() + '''
+            (async()=>{
+              const M=w.MW;
+              const d=JSON.parse((await M.call('export_all',{},true)).service_response.json);
+              const shape = d.version===2 && d._说明 && d.workday && d.maintenance &&
+                            Array.isArray(d.workday.todos) && Array.isArray(d.maintenance.projects);
+              if(!shape){console.log('FAIL shape');return;}
+              d.workday.todos[0].text='【AI改】测试待办';
+              d.maintenance.projects[0].counter=99999;
+              const slug=d.maintenance.projects[0].slug;
+              await M.call('delete_project',{slug},true);
+              const r=(await M.call('import_projects',{json:JSON.stringify(d)},true)).service_response||{};
+              const s=await M.snapshot();
+              const p=s.maintenance.projects.find(x=>x.slug===slug);
+              const ok = r.workday_restored && s.workday.todos[0].text==='【AI改】测试待办' &&
+                         p && p.counter===99999 && p.items.length>0 && p.history.length>0;
+              console.log(ok?'OK':'FAIL');
             })().catch(e=>console.log('ERR '+e.message));
         '''
         self.assertIn('OK', self.run_node(script))
