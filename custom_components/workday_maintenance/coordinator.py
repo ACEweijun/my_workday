@@ -30,8 +30,32 @@ class MergedCoordinator(DataUpdateCoordinator):
         self.store = MergedStore(hass)
         self._holidays: dict[int, dict] = {}
         self._sources: dict[int, str] = {}
+        self._snapshot_cache: dict[int, dict | None] = {}
         self._lock = asyncio.Lock()
         super().__init__(hass, _LOGGER, name=DOMAIN)
+
+    async def async_warm_snapshots(self, years=None):
+        """启动阶段在线程池预读节假日快照，避免事件循环内同步 IO。"""
+        if years is None:
+            now = dt_util.now().date()
+            years = (now.year, now.year + 1)
+
+        def load():
+            out = {}
+            for year in years:
+                path = Path(__file__).parent / "holidays_snapshot" / f"{year}.json"
+                if not path.is_file():
+                    out[year] = None
+                    continue
+                try:
+                    payload = json.loads(path.read_text(encoding="utf-8"))
+                    ok, parsed = self._payload_has_data(payload, year)
+                    out[year] = parsed if ok else None
+                except Exception as err:  # noqa: BLE001
+                    _LOGGER.debug("读取 %s 年内置节假日快照失败：%s", year, err)
+                    out[year] = None
+            return out
+        self._snapshot_cache.update(await self.hass.async_add_executor_job(load))
 
     @property
     def soon_days(self) -> int:
@@ -67,17 +91,8 @@ class MergedCoordinator(DataUpdateCoordinator):
         return bool(parsed["off"] or parsed["makeup"]), parsed
 
     def _load_snapshot(self, year: int) -> dict | None:
-        """读取打包在集成内的节假日快照（网络全失败时的最终兜底）。"""
-        try:
-            path = Path(__file__).parent / "holidays_snapshot" / f"{year}.json"
-            if not path.is_file():
-                return None
-            payload = json.loads(path.read_text(encoding="utf-8"))
-            ok, parsed = self._payload_has_data(payload, year)
-            return parsed if ok else None
-        except Exception as err:  # noqa: BLE001
-            _LOGGER.debug("读取 %s 年内置节假日快照失败：%s", year, err)
-            return None
+        """返回启动阶段预读的节假日快照（网络全失败时的最终兜底）。"""
+        return self._snapshot_cache.get(year)
 
     async def _ensure_holidays(self, raw: dict, now: dt.date) -> None:
         overrides = raw["workday"].get("year_override") or {}
