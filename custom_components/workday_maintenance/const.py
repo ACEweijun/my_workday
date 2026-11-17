@@ -13,6 +13,14 @@ PANEL_MAINTENANCE_PATH = "workday_maintenance_panel"
 EVENT_UPDATED = "workday_maintenance_updated"
 
 DEFAULT_HOLIDAY_URL = "https://cdn.jsdelivr.net/gh/NateScarlet/holiday-cn@master/{year}.json"
+# 多源兜底：依次尝试，任一成功即用；全部失败再用内置快照。
+# 用户可通过选项 CONF_HOLIDAY_URL 自定义第一优先级源。
+HOLIDAY_FALLBACK_URLS = (
+    "https://ghproxy.net/https://raw.githubusercontent.com/NateScarlet/holiday-cn/master/{year}.json",
+    "https://gh-proxy.com/https://raw.githubusercontent.com/NateScarlet/holiday-cn/master/{year}.json",
+    "https://gcore.jsdelivr.net/gh/NateScarlet/holiday-cn@master/{year}.json",
+    "https://raw.githubusercontent.com/NateScarlet/holiday-cn/master/{year}.json",
+)
 CONF_HOLIDAY_URL = "holiday_url"
 CONF_SYNC_DUE_TO_TODOS = "sync_due_to_todos"
 CONF_NOTIFY_SERVICE = "notify_service"
