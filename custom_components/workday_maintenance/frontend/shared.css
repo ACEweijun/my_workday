@@ -138,6 +138,9 @@ main{max-width:920px;margin:0 auto;padding:14px;display:flex;flex-direction:colu
 .mt-item.st-due{background:var(--danger-soft)}
 .mt-item.st-soon{background:var(--warn-soft)}
 .mt-item.st-ok{background:var(--ok-soft)}
+/* 未设基准 = 还没数据，不着色：保持中性底，竖条也压淡，视觉上不跟三个状态抢注意力 */
+.mt-item.st-unset{background:var(--inset)}
+.mt-item.st-unset::before{opacity:.3}
 .mt-item.st-due::before{background:var(--danger);opacity:1}
 .mt-item.st-soon::before{background:var(--warn);opacity:1}
 .mt-item.st-ok::before{background:var(--ok);opacity:.8}
