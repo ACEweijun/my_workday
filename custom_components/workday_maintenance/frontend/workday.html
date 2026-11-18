@@ -225,7 +225,7 @@
       : '<div class="num red">' + S.maintenance.due_total + ' 项</div><div class="lbl">维护已到期</div>';
     $('stats').innerHTML =
       '<div class="stat"><div class="num blue">' + ms.left + '/' + ms.total + '</div>' +
-        '<div class="lbl">' + year + '-' + String(month).padStart(2, '0') + ' 进度</div></div>' +
+        '<div class="lbl">进度</div></div>' +
       '<div class="stat" data-jump-today style="cursor:pointer" title="回到本月并定位到今天">' +
         '<div class="num">' + (w.today_work ? '上班' : '休息') + '</div>' +
         '<div class="lbl">今天</div></div>' +
