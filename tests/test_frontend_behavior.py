@@ -209,5 +209,32 @@ class TestFrontendBehavior(unittest.TestCase):
         self.assertIn('OK', self.run_node(script))
 
 
+    def test_due_text_countdown(self):
+        """小项主行倒计时文案：已超期/还剩，超期很久用年+月表述。"""
+        script = self._env_setup() + '''
+            const src = require('fs').readFileSync(DIR+'/maintenance.html','utf8');
+            const grab=(name)=>{
+              const m=src.match(new RegExp('function '+name+'\\\\([^)]*\\\\)\\\\s*\\\\{[\\\\s\\\\S]*?\\\\n  \\\\}'));
+              if(!m) throw new Error('no '+name);
+              return eval('('+m[0]+')');
+            };
+            const dueText=grab('dueText');
+            const humanDays=grab('humanDays');
+            const P={need_counter:true,counter_unit:'公里'};
+            const t=(st)=>dueText(st,P);
+            const checks=[
+              t({remaining_days:-2230,remaining_counter:null})==='已超期 6 年 1 个月',
+              t({remaining_days:-12,remaining_counter:null})==='已超期 12 天',
+              t({remaining_days:45,remaining_counter:null})==='还剩 45 天',
+              t({remaining_days:100,remaining_counter:-2000})==='已超期 2000 公里',
+              t({remaining_days:100,remaining_counter:3000})==='还剩 3000 公里',
+              t({remaining_days:null,remaining_counter:null})==='未设基准',
+              humanDays(425)==='1 年 2 个月', humanDays(30)==='30 天'
+            ];
+            console.log(checks.every(Boolean)?'OK':'FAIL '+JSON.stringify(checks));
+        '''
+        self.assertIn('OK', self.run_node(script))
+
+
 if __name__ == '__main__':
     unittest.main()
