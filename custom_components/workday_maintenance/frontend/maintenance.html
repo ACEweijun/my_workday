@@ -153,6 +153,34 @@
     var s = summary();
     return (s && (s.items || []).filter(function (i) { return i.id === id; })[0]) || {};
   }
+  // 天数表述：超期很久用"年/月"更好读，1 年内直接用天数
+  function humanDays(d) {
+    var n = Math.abs(d);
+    if (n >= 365) {
+      var y = Math.floor(n / 365), rest = n - y * 365;
+      var mo = Math.floor(rest / 30);
+      var out = y + ' 年';
+      if (mo) out += ' ' + mo + ' 个月';
+      return out;
+    }
+    return n + ' 天';
+  }
+  // 倒计时文案：优先展示"已超期"的维度；都没超期时，有里程基准看里程，否则看天数。
+  function dueText(st, p) {
+    var rd = st.remaining_days, rc = st.remaining_counter;
+    var unit = (p && p.counter_unit) ? p.counter_unit : '';
+    var hasC = rc != null, hasD = rd != null;
+    if (!hasC && !hasD) return '未设基准';
+    // 已超期：优先显示超期幅度更大的那个维度
+    if (hasC && rc <= 0 && hasD && rd <= 0) {
+      return '已超期 ' + Math.abs(rc) + ' ' + unit + ' / ' + humanDays(rd);
+    }
+    if (hasC && rc <= 0) return '已超期 ' + Math.abs(rc) + ' ' + unit;
+    if (hasD && rd <= 0) return '已超期 ' + humanDays(rd);
+    // 未超期：有里程基准优先看里程（车辆保养以里程为准）
+    if (hasC) return '还剩 ' + rc + ' ' + unit;
+    return '还剩 ' + rd + ' 天';
+  }
   function recordById(id) {
     var p = project(); if (!p) return null;
     return (p.history || []).filter(function (r) { return r.id === id; })[0] || null;
@@ -217,17 +245,17 @@
       var open = !!itemOpen[i.id];
       var last = recs[0] || null;
       var meta;
+      var tip = '点击展开维护记录';
+      if (last) {
+        var cnt = Number(last.counter);
+        tip = '上次 ' + last.date + (cnt > 0 && p.need_counter ? ' · ' + cnt + ' ' + (p.counter_unit || '') : '') +
+              '　|　' + dueText(st, p);
+      }
       if (!last) {
         meta = '<div class="item-meta-static">暂无维护记录</div>';
       } else {
-        var bits = ['上次 ' + M.esc(last.date)];
-        // 里程为 0 / 空通常是没填的占位，不显示，避免制造噪音；真实里程(>0)才保留。
-        var cnt = Number(last.counter);
-        if (last.counter != null && last.counter !== '' && !isNaN(cnt) && cnt > 0) {
-          bits.push(M.esc(last.counter) + (p.need_counter ? ' ' + M.esc(p.counter_unit || '') : ''));
-        }
         meta = '<button class="ghost item-meta-toggle" data-rectoggle="' + M.esc(i.id) +
-          '" title="点击展开维护记录">' + bits.join(' · ') + ' ' + (open ? '▴' : '▸') + '</button>';
+          '" title="' + M.esc(tip) + '">' + M.esc(dueText(st, p)) + ' ' + (open ? '▴' : '▸') + '</button>';
       }
       var recHtml = recs.length ? recs.slice(0, 5).map(function (r) {
         var e = (r.entries || []).filter(function (x) { return x.item_id === i.id; })[0] || {};
