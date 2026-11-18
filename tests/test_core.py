@@ -335,10 +335,11 @@ class TestRepo(unittest.TestCase):
     def test_stats_follow_month_and_jump_today(self):
         html = (PKG / 'frontend' / 'workday.html').read_text(encoding='utf-8')
         for token in ('function monthStats()', 'function jumpToday()',
-                      'data-jump-today', ' 进度', 'padStart(2',
+                      'data-jump-today', '<div class="lbl">进度</div>',
                       'renderStats(); renderCal();'):
             self.assertIn(token, html)
         self.assertNotIn('dateLabel', html)
+        self.assertNotIn('剩余/总数', html)
         self.assertNotIn('本月工作日', html)
 
     def test_next_special_day_merges_holidays_and_anniversaries(self):
@@ -799,6 +800,26 @@ class TestNewDaySensors(unittest.TestCase):
         self.assertEqual(d.weekday(), 1)
         self.assertEqual(names[d.weekday()], "星期二")
         self.assertEqual(d.isoweekday(), 2)
+
+
+class TestItemStatusDisplay(unittest.TestCase):
+    def test_items_sorted_by_status(self):
+        """小项按状态排序：已到期置顶，同状态保持原顺序。"""
+        m = (PKG / 'frontend' / 'maintenance.html').read_text(encoding='utf-8')
+        self.assertIn('var priority = { due: 0, soon: 1, unset: 2, ok: 3 };', m)
+        self.assertIn('sorted.map(function (entry)', m)
+        self.assertIn('a.idx - b.idx', m)
+        self.assertIn('stateOf(i.id).status', m)
+
+    def test_status_pill_removed(self):
+        """状态标签已从卡片移除，改由整卡底色表达状态。"""
+        m = (PKG / 'frontend' / 'maintenance.html').read_text(encoding='utf-8')
+        self.assertNotIn('pill(st.status)', m)
+        css = (PKG / 'frontend' / 'shared.css').read_text(encoding='utf-8')
+        for token in ('.mt-item.st-due{background:var(--danger-soft)}',
+                      '.mt-item.st-soon{background:var(--warn-soft)}',
+                      '.mt-item.st-ok{background:var(--ok-soft)}'):
+            self.assertIn(token, css)
 
 
 if __name__ == '__main__':
