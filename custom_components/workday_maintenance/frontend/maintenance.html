@@ -201,7 +201,17 @@
   function renderItems() {
     var p = project();
     if (!p) { $('items').innerHTML = '<div class="hint">先新建一个项目。</div>'; return; }
-    $('items').innerHTML = (p.items || []).map(function (i) {
+    // 按状态排序：已到期置顶，其次快到了/未设基准/正常；同状态保持原顺序。
+    var priority = { due: 0, soon: 1, unset: 2, ok: 3 };
+    var sorted = (p.items || []).map(function (i, idx) {
+      return { item: i, idx: idx, status: stateOf(i.id).status || 'unset' };
+    }).sort(function (a, b) {
+      var pa = priority[a.status] == null ? 4 : priority[a.status];
+      var pb = priority[b.status] == null ? 4 : priority[b.status];
+      return (pa - pb) || (a.idx - b.idx);
+    });
+    $('items').innerHTML = sorted.map(function (entry) {
+      var i = entry.item;
       var st = stateOf(i.id);
       var recs = itemRecords(p, i.id);
       var open = !!itemOpen[i.id];
@@ -229,7 +239,7 @@
       return '<div class="mt-item st-' + M.esc(st.status || 'unset') + '"><div class="top item-title" data-item="' + M.esc(i.id) +
         '" title="点名称编辑小项 · 点空白处给它记一次新维护">' +
         '<b data-itemname title="点击编辑小项">' + M.esc(i.name) + '</b>' +
-        pill(st.status) + '</div>' +
+        '</div>' +
         meta +
         (open && recHtml ? '<div class="sub-list item-records">' + recHtml + '</div>' : '') +
         '</div>';
