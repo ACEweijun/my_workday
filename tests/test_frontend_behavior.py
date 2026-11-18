@@ -66,6 +66,51 @@ class TestFrontendBehavior(unittest.TestCase):
         '''
         self.assertIn('OK', self.run_node(script))
 
+    def test_extract_conn_handles_all_shapes(self):
+        """HA 前端窗口连接可能是 {auth,conn}/裸conn/Promise，解包必须都能拿到带 callWS 的 conn。"""
+        script = self._env_setup() + '''
+            const src = require('fs').readFileSync(DIR+'/shared.js','utf8');
+            const m = src.match(/function extractConn\\(v\\) \\{[\\s\\S]*?\\n  \\}/);
+            if(!m){console.log('FAIL no extractConn');return;}
+            const extractConn = eval('(' + m[0] + ')');
+            const mk=()=>({callWS:()=>Promise.resolve('ok')});
+            const cases=[
+              {auth:{accessToken:'AT'},conn:mk()},   // 新版 HA：{auth, conn}
+              mk(),                                    // 旧版：裸 conn
+              Promise.resolve({auth:{},conn:mk()}),    // Promise 包装
+              Promise.resolve(mk())
+            ];
+            Promise.all(cases.map(v=>Promise.resolve(v).then(extractConn).catch(()=>null)))
+              .then(list=>{
+                const ok = list.every(c=>c && typeof c.callWS==='function');
+                const unknown = extractConn({foo:1});
+                console.log(ok && unknown===null ? 'OK' : 'FAIL');
+              }).catch(e=>console.log('ERR '+e.message));
+        '''
+        self.assertIn('OK', self.run_node(script))
+
+    def test_parent_conn_absent_returns_null(self):
+        """没有父连接时必须返回 null（falsy），否则 connect() 永远不会走自建 WS 分支。"""
+        script = self._env_setup() + '''
+            const src = require('fs').readFileSync(DIR+'/shared.js','utf8');
+            const m = src.match(/function parentHassConn\\(\\) \\{[\\s\\S]*?\\n  \\}/);
+            if(!m){console.log('FAIL no parentHassConn');return;}
+            const parentHassConn = eval('(' + m[0] + ')');
+            const r = parentHassConn();
+            console.log(r===null || r===undefined ? 'OK' : 'FAIL '+typeof r);
+        '''
+        self.assertIn('OK', self.run_node(script))
+
+    def test_401_retries_then_gives_clear_hint(self):
+        """401 会重试（退避），最终失败给出明确的刷新提示，而不是无限自动重试。"""
+        script = self._env_setup() + '''
+            const src = require('fs').readFileSync(DIR+'/shared.js','utf8');
+            const ok = /r\\.status === 401 && \\(retried \\|\\| 0\\) < 3/.test(src) &&
+                       /登录态已失效，请刷新页面重新登录/.test(src);
+            console.log(ok?'OK':'FAIL');
+        '''
+        self.assertIn('OK', self.run_node(script))
+
     def test_create_loader_loads_demo_data(self):
         """createLoader 真实走 demo 覆盖层取数并触发 render。"""
         script = self._env_setup() + '''
