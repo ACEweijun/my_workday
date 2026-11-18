@@ -820,6 +820,9 @@ class TestItemStatusDisplay(unittest.TestCase):
                       '.mt-item.st-soon{background:var(--warn-soft)}',
                       '.mt-item.st-ok{background:var(--ok-soft)}'):
             self.assertIn(token, css)
+        # 未设基准不着色：保持中性底，不占用状态色
+        self.assertIn('.mt-item.st-unset{background:var(--inset)}', css)
+        self.assertIn('.mt-item.st-unset::before{opacity:.3}', css)
 
 
 if __name__ == '__main__':
