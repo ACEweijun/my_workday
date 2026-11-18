@@ -134,6 +134,10 @@ main{max-width:920px;margin:0 auto;padding:14px;display:flex;flex-direction:colu
 .mt-side .tab{width:100%;text-align:left}
 .mt-item{position:relative;border:.5px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:8px;background:var(--inset)}
 .mt-item::before{content:"";position:absolute;left:0;top:10px;bottom:10px;width:3px;border-radius:2px;background:var(--muted);opacity:.55}
+/* 状态色铺满整卡底色（左侧竖条保留作为额外提示） */
+.mt-item.st-due{background:var(--danger-soft)}
+.mt-item.st-soon{background:var(--warn-soft)}
+.mt-item.st-ok{background:var(--ok-soft)}
 .mt-item.st-due::before{background:var(--danger);opacity:1}
 .mt-item.st-soon::before{background:var(--warn);opacity:1}
 .mt-item.st-ok::before{background:var(--ok);opacity:.8}
