@@ -18,12 +18,32 @@ window.MW = (function () {
     try { var raw = localStorage.getItem('hassTokens'); return raw ? JSON.parse(raw) : null; }
     catch (e) { return null; }
   }
-  function parentHassConn() {
-    try {
-      if (window.hassConnection) return window.hassConnection;
-      if (window.parent && window.parent !== window && window.parent.hassConnection) return window.parent.hassConnection;
-    } catch (e) {}
+  // 从候选对象里取出"真正的" conn（带 callWS 的那个）。
+  // 新版 HA 前端的 window.hassConnection 是 {auth, conn} 形态；旧版是裸 conn；
+  // 也可能是 Promise。直接当 conn 用会拿到没有 callWS 的对象，导致静默退化到 REST 后 401。
+  function extractConn(v) {
+    if (!v) return null;
+    if (typeof v.callWS === 'function') return v;          // 已经是 conn
+    if (v.conn && typeof v.conn.callWS === 'function') return v.conn;  // {auth, conn}
     return null;
+  }
+  function parentHassConn() {
+    var cands = [];
+    try { if (window.hassConnection) cands.push(window.hassConnection); } catch (e) {}
+    try {
+      if (window.parent && window.parent !== window && window.parent.hassConnection) {
+        cands.push(window.parent.hassConnection);
+      }
+    } catch (e) {}
+    // 依次尝试：可能是 Promise，需 await 后再解包
+    if (!cands.length) return null;   // 没有候选时返回 null（保持"无父连接"语义）
+    var tries = cands.map(function (c) {
+      return Promise.resolve(c).then(extractConn).catch(function () { return null; });
+    });
+    return Promise.all(tries).then(function (list) {
+      for (var i = 0; i < list.length; i++) if (list[i]) return list[i];
+      return null;
+    });
   }
   function legacyToken() {
     var now = Math.floor(Date.now() / 1000);
@@ -58,7 +78,10 @@ window.MW = (function () {
     var connP = parentHassConn();
     if (connP) {
       return connP.then(function (c) {
-        var tk = c && c.auth && c.auth.accessToken;
+        // conn 上取 token：hass-websocket 的 conn 把认证放在 options.auth / auth
+        var tk = (c && c.options && c.options.auth && c.options.auth.accessToken) ||
+                 (c && c.auth && c.auth.accessToken) ||
+                 (c && c.options && c.options.authToken);
         if (!tk) return legacyToken();
         token = tk;
         tokenExp = now + 60;
@@ -81,7 +104,16 @@ window.MW = (function () {
       });
       return fetch(location.origin + path, opt);
     }).then(function (r) {
-      if (r.status === 401 && !retried) { token = null; tokenExp = 0; return api(path, opt, true); }
+      if (r.status === 401 && (retried || 0) < 3) {
+        // 令牌可能刚好过期：清掉缓存重新取，并退避等待 HA 前端刷新令牌
+        token = null; tokenExp = 0;
+        var attempt = (retried || 0) + 1;
+        return new Promise(function (r2) { setTimeout(r2, 300 * attempt); })
+          .then(function () { return api(path, opt, attempt); });
+      }
+      if (r.status === 401) {
+        throw new Error('登录态已失效，请刷新页面重新登录 Home Assistant');
+      }
       if (!r.ok) return r.text().then(function (t) { throw new Error('请求失败 ' + r.status + ' ' + t.slice(0, 200)); });
       return r.text().then(function (t) { return t ? JSON.parse(t) : null; });
     });
@@ -96,7 +128,10 @@ window.MW = (function () {
   function call(service, data, wantResponse) {
     var connP = parentHassConn();
     if (connP) {
-      return connP.then(function (c) { return callViaConn(c, service, data, wantResponse); })
+      return connP.then(function (c) {
+        if (!c) throw new Error('父页面连接不可用');
+        return callViaConn(c, service, data, wantResponse);
+      })
         .catch(function () {
           var path = '/api/services/' + DOMAIN + '/' + service + (wantResponse ? '?return_response=true' : '');
           return api(path, { method: 'POST', body: JSON.stringify(data || {}) })
@@ -127,10 +162,12 @@ window.MW = (function () {
   function snapshot() {
     var connP = parentHassConn();
     if (connP) {
-      return connP.then(function (c) { return c.callWS({ type: DOMAIN + '/snapshot' }); })
-        .catch(function () {
-          return snapshotViaWS().catch(function () { return call('get_snapshot', {}, true); });
-        });
+      return connP.then(function (c) {
+        if (!c) throw new Error('父页面连接不可用');
+        return c.callWS({ type: DOMAIN + '/snapshot' });
+      }).catch(function () {
+        return snapshotViaWS().catch(function () { return call('get_snapshot', {}, true); });
+      });
     }
     return snapshotViaWS().catch(function () { return call('get_snapshot', {}, true); });
   }
