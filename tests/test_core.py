@@ -691,7 +691,7 @@ class TestRepo(unittest.TestCase):
         m = (PKG / 'frontend' / 'maintenance.html').read_text(encoding='utf-8')
         for token in ('function itemRecords(', 'data-recitem=', 'item-records',
                       'data-rectoggle=', 'itemOpen',
-                      'item-meta-toggle', "'上次 ' + M.esc(last.date)", '暂无维护记录',
+                      'item-meta-toggle', 'dueText(st, p)', '暂无维护记录',
                       'openRecForm(recordId, focusItem)', 'id="recFocus"',
                       '编辑这条维护记录', '移除这条记录', 'renderRecEntries(p, rec, focusItem)',
                       'if (!focus || e.item_id === focus)'):
@@ -753,7 +753,7 @@ class TestRepo(unittest.TestCase):
     def test_item_notes_hidden_in_list(self):
         """列表页不显示小项备注与最近维护备注（数据仍在，编辑弹窗可查看）。"""
         m = (PKG / 'frontend' / 'maintenance.html').read_text(encoding='utf-8')
-        for token in ('var last = recs[0] || null', "'上次 ' + M.esc(last.date)",
+        for token in ('var last = recs[0] || null', 'dueText(st, p)',
                       '暂无维护记录', 'item-meta-static'):
             self.assertIn(token, m)
         self.assertNotIn('lastEntry', m)
