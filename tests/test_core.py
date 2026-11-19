@@ -825,5 +825,44 @@ class TestItemStatusDisplay(unittest.TestCase):
         self.assertIn('.mt-item.st-unset::before{opacity:.3}', css)
 
 
+class TestReminderSettings(unittest.TestCase):
+    def test_settings_store_isolated_from_archive(self):
+        """提醒设置存独立 key，不进导出存档（密钥/去重不随存档外带）。"""
+        store = (PKG / 'store.py').read_text(encoding='utf-8')
+        self.assertIn('SETTINGS_KEY = "workday_maintenance.settings"', (PKG / 'const.py').read_text(encoding='utf-8'))
+        self.assertIn('class SettingsStore', store)
+        self.assertIn('def normalize_settings', store)
+        self.assertIn('"advance_days": [7, 3, 1]', store)
+        self.assertIn('"weekday": 6', store)
+        self.assertIn('"time": "09:00"', store)
+
+    def test_services_registered_and_declared(self):
+        init = (PKG / '__init__.py').read_text(encoding='utf-8')
+        yaml = (PKG / 'services.yaml').read_text(encoding='utf-8')
+        const = (PKG / 'const.py').read_text(encoding='utf-8')
+        self.assertIn('SERVICE_GET_SETTINGS = "get_settings"', const)
+        self.assertIn('SERVICE_SET_SETTINGS = "set_settings"', const)
+        self.assertIn('(SERVICE_GET_SETTINGS, get_settings)', init)
+        self.assertIn('(SERVICE_SET_SETTINGS, set_settings)', init)
+        self.assertIn('get_settings:', yaml)
+        self.assertIn('set_settings:', yaml)
+
+    def test_notify_module_logic(self):
+        n = (PKG / 'notify.py').read_text(encoding='utf-8')
+        for token in ('class NotifyManager', 'async def check_anniversaries',
+                      'async def check_maintenance', 'wd.anniversary_next',
+                      'mnt.all_due_items', '/api/push', 'Authorization',
+                      'def _should_send', 'def _mark_sent'):
+            self.assertIn(token, n)
+
+    def test_schedule_reads_settings_time(self):
+        init = (PKG / '__init__.py').read_text(encoding='utf-8')
+        self.assertIn('async def _check_reminders', init)
+        self.assertIn('hhmm == ann.get("time")', init)
+        self.assertIn('hhmm == mt.get("time")', init)
+        self.assertIn('now.weekday() == int(mt.get("weekday", 6))', init)
+        self.assertIn('async_track_time_change(hass, _check_reminders, second=0)', init)
+
+
 if __name__ == '__main__':
     unittest.main()
