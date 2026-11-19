@@ -45,6 +45,35 @@ window.MW = (function () {
       return null;
     });
   }
+  // 返回父页面完整的 {auth, conn} 结构（手机 App 的 token 在 auth.data.access_token，
+  // 只保留 conn 会丢掉 auth，所以取 token 必须从这里取）。
+  function parentAuthInfo() {
+    var cands = [];
+    try { if (window.hassConnection) cands.push(window.hassConnection); } catch (e) {}
+    try {
+      if (window.parent && window.parent !== window && window.parent.hassConnection) {
+        cands.push(window.parent.hassConnection);
+      }
+    } catch (e) {}
+    if (!cands.length) return Promise.resolve(null);
+    return Promise.all(cands.map(function (c) {
+      return Promise.resolve(c).catch(function () { return null; });
+    })).then(function (list) {
+      for (var i = 0; i < list.length; i++) if (list[i]) return list[i];
+      return null;
+    });
+  }
+  function tokenFromAuth(x) {
+    if (!x) return null;
+    var a = x.auth || (x.options && x.options.auth) || null;
+    // 先取 authToken（可能独立于 auth 对象存在），再取 auth 下的各种位置
+    var direct = x.options && x.options.authToken;
+    if (direct) return direct;
+    if (!a) return null;
+    return a.accessToken || a.access_token ||
+           (a.data && a.data.access_token) ||
+           (a.data && a.data.accessToken) || null;
+  }
   function legacyToken() {
     var now = Math.floor(Date.now() / 1000);
     var t = readTokens();
@@ -75,13 +104,10 @@ window.MW = (function () {
     var now = Math.floor(Date.now() / 1000);
     if (token && tokenExp > now + 30) return Promise.resolve(token);
     token = null;
-    var connP = parentHassConn();
-    if (connP) {
-      return connP.then(function (c) {
-        // conn 上取 token：hass-websocket 的 conn 把认证放在 options.auth / auth
-        var tk = (c && c.options && c.options.auth && c.options.auth.accessToken) ||
-                 (c && c.auth && c.auth.accessToken) ||
-                 (c && c.options && c.options.authToken);
+    var infoP = parentAuthInfo();
+    if (infoP) {
+      return infoP.then(function (info) {
+        var tk = tokenFromAuth(info) || tokenFromAuth(info && info.conn);
         if (!tk) return legacyToken();
         token = tk;
         tokenExp = now + 60;
