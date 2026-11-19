@@ -39,6 +39,14 @@
           <div><label>提醒时间</label><input type="time" id="setMaintTime" value="09:00"></div>
         </div>
 
+        <div class="set-group"><b>数据管理</b>
+          <div class="full" style="grid-column:1/-1">
+            <button class="ghost" id="setExport" title="导出全部数据（含工作日、待办、纪念日与所有维护项目）">导出全部数据 (.json)</button>
+            <button class="ghost" id="setImport" title="粘贴导出存档 JSON 恢复全部数据">导入数据</button>
+          </div>
+          <div class="hint" style="grid-column:1/-1">导出的是完整存档（工作日 + 维护台账），不是单个项目。</div>
+        </div>
+
         <div class="full modal-actions">
           <button class="primary" id="setSave">保存设置</button>
           <button class="ghost" id="setCancel">返回台账</button>
@@ -285,17 +293,19 @@
 
   function render() { renderSide(); renderCounter(); renderItems(); renderHistory(); }
   function renderSide() {
+    // 设置按钮固定在最左，用独立底色与项目标签区分；进入设置视图后隐藏项目标签和＋。
+    var settingTab = '<button class="tab setting' + (view === 'settings' ? ' on' : '') +
+      '" id="projSetting" title="提醒设置与数据管理">⚙ 设置</button>';
+    if (view === 'settings') { $('projSide').innerHTML = settingTab; return; }
     var list = S.maintenance.projects || [];
     $('projHint').hidden = list.length > 0;
-    $('projSide').innerHTML = list.map(function (p) {
+    $('projSide').innerHTML = settingTab + list.map(function (p) {
       var s = (S.maintenance.summaries || []).filter(function (x) { return x.slug === p.slug; })[0] || {};
       var on = p.slug === slug;
       return '<button class="tab' + (on ? ' on' : '') + '" data-tab="' + M.esc(p.slug) + '"' +
         (on ? ' title="再点一次编辑项目"' : ' title="切换到这个项目"') + '>' +
         M.esc(p.name) + (s.due_count ? '<span class="badge">' + s.due_count + '</span>' : '') + '</button>';
-    }).join('') +
-      '<button class="tab setting' + (view === 'settings' ? ' on' : '') + '" id="projSetting" title="提醒设置">⚙ 设置</button>' +
-      '<button class="tab add primary" id="projPlus" title="新建 / 导入 / 导出">＋</button>';
+    }).join('') + '<button class="tab add primary" id="projPlus" title="新建项目">＋</button>';
   }
   function renderCounter() {
     var p = project();
@@ -426,9 +436,7 @@
   function closeProjMenu() { $('pmMenu').hidden = true; }
   function openProjMenu(btn) {
     var el = $('pmMenu');
-    el.innerHTML = '<button data-menu-act="new">新建项目</button>' +
-      '<button data-menu-act="import">导入</button>' +
-      '<button data-menu-act="export">导出</button>';
+    el.innerHTML = '<button data-menu-act="new">新建项目</button>';
     var r = btn.getBoundingClientRect();
     el.hidden = false;
     var left = Math.max(8, Math.min(r.left, window.innerWidth - el.offsetWidth - 8));
@@ -462,6 +470,7 @@
     var btn = $('importSave'); btn.disabled = true;
     M.call('import_projects', { json: text }, true).then(function (res) {
       hideModals();
+      if (view === 'settings') showView('normal');  // 从设置页发起的导入：回到台账让用户看到结果
       var added = (res && res.added) || [], errs = (res && res.errors) || [];
       if (errs.length) M.toast('已导入 ' + added.length + ' 个项目；' + errs.length + ' 条跳过：' + errs[0], true);
       else M.toast('已导入 ' + added.length + ' 个项目');
@@ -647,7 +656,7 @@
     var setting = e.target.closest && e.target.closest('#projSetting');
     if (setting) { showView(view === 'settings' ? 'normal' : 'settings'); return; }
     var plus = e.target.closest && e.target.closest('#projPlus');
-    if (plus) { openProjMenu(plus); return; }
+    if (plus) { openForm(false); return; }
     var t = e.target.closest && e.target.closest('[data-tab]'); if (!t) return;
     var target = t.dataset.tab;
     if (target === slug) { openForm(true); return; }
@@ -655,6 +664,8 @@
   };
   $('setSave').onclick = saveSettings;
   $('setCancel').onclick = function () { showView('normal'); };
+  $('setExport').onclick = exportCurrent;
+  $('setImport').onclick = openImport;
   $('projCounter').onchange = syncUnit;
   $('projSave').onclick = submitProject;
   $('projCancel').onclick = resetForms;
@@ -669,8 +680,6 @@
     if (it) {
       var act = it.dataset.menuAct; closeProjMenu();
       if (act === 'new') openForm(false);
-      else if (act === 'import') openImport();
-      else if (act === 'export') exportCurrent();
       return;
     }
     if (e.target.closest && e.target.closest('#projPlus')) return;
