@@ -495,7 +495,7 @@ class TestRepo(unittest.TestCase):
 
     def test_project_name_click_edits_and_modal_has_delete(self):
         m = (PKG / 'frontend' / 'maintenance.html').read_text(encoding='utf-8')
-        for token in ("if (target === slug) { openForm(true); return; }",
+        for token in ("if (target === slug) { if (view === 'settings') showView('normal'); else openForm(true); return; }",
                       'openForm(true)', 'id="projDelete"', 'function deleteProject()',
                       'id="projExtra"', 'function renderCounter()'):
             self.assertIn(token, m)
@@ -866,13 +866,15 @@ class TestViewDomStructure(unittest.TestCase):
 
 
 class TestSettingsNavigation(unittest.TestCase):
-    def test_setting_tab_fixed_left_and_hides_projects(self):
-        """设置按钮固定在项目栏最左，进入设置页后项目标签不显示。"""
+    def test_setting_tab_fixed_left_projects_always_visible(self):
+        """设置按钮固定在项目栏最左；进设置页时项目标签照常显示（与主视图一致）。"""
         m = (PKG / 'frontend' / 'maintenance.html').read_text(encoding='utf-8')
         side = m.split('function renderSide()')[1].split('function renderCounter')[0]
         self.assertLess(side.index('settingTab'), side.index('list.map('))
-        self.assertIn("view === 'settings'", side)
-        self.assertIn('innerHTML = settingTab; return;', side)
+        self.assertIn("view === 'settings' ? ' on' : ''", side)
+        self.assertNotIn('innerHTML = settingTab; return;', side)
+        # 从设置页点项目标签应回台账
+        self.assertIn("if (view === 'settings') showView('normal');", m)
 
     def test_import_returns_to_ledger(self):
         """从设置页发起导入，成功后回台账让用户看到结果。"""
