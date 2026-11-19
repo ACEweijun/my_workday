@@ -289,5 +289,27 @@ class TestFrontendBehavior(unittest.TestCase):
         self.assertIn('OK', self.run_node(script))
 
 
+    def test_push_form_roundtrip(self):
+        """push 表单：custom 模式的提前天数/时间/星期可正确填充与读回。"""
+        script = self._env_setup() + '''
+            const M=w.MW;
+            const els={
+              xPushMode:{value:'custom',hidden:false,onchange:null},
+              xPushCustom:{value:'',hidden:true,onchange:null},
+              xPushDays:{value:'5,1',hidden:false,onchange:null},
+              xPushTime:{value:'07:45',hidden:false,onchange:null},
+              xPushWeekday:{value:'3',hidden:false,onchange:null}
+            };
+            doc.getElementById=function(id){return els[id]||null;};
+            const got=M.readPushForm('x');
+            const ok = got.mode==='custom' && got.advance_days.join()==='5,1' &&
+                       got.time==='07:45' && got.weekday===3;
+            M.fillPushForm('x',{mode:'off'});
+            const ok2 = els.xPushMode.value==='off' && els.xPushCustom.hidden===true;
+            console.log(ok&&ok2?'OK':'FAIL '+JSON.stringify(got));
+        '''
+        self.assertIn('OK', self.run_node(script))
+
+
 if __name__ == '__main__':
     unittest.main()
