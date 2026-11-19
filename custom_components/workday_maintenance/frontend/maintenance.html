@@ -13,7 +13,41 @@
 <main class="mt-layout">
   <aside class="mt-side" id="projSide"></aside>
   <div class="mt-main">
-    <section class="card">
+    <!-- 设置视图：与正常视图互斥切换 -->
+    <section class="card" id="settingsView" hidden>
+      <div class="card-head"><h2>提醒设置</h2><span class="spacer"></span></div>
+      <div class="settings-body">
+        <div class="hint">提醒通过魔法推送（magicpush）发出。先在 magicpush 里创建推送接口拿到 token，填到下面；再开启需要的提醒。</div>
+
+        <div class="set-group"><b>魔法推送</b>
+          <div><label>服务地址</label><input id="setPushUrl" placeholder="https://push.example.com"></div>
+          <div><label>接口 Token</label><input id="setPushToken" placeholder="推送接口 token" type="password"></div>
+        </div>
+
+        <div class="set-group"><b>纪念日提醒</b>
+          <div><label>开启</label><input type="checkbox" id="setAnnOn"></div>
+          <div><label>提前天数</label><input id="setAnnDays" placeholder="7,3,1" hint="用英文逗号分隔"></div>
+          <div><label>提醒时间</label><input type="time" id="setAnnTime" value="08:00"></div>
+        </div>
+
+        <div class="set-group"><b>维护提醒</b>
+          <div><label>开启</label><input type="checkbox" id="setMaintOn"></div>
+          <div><label>每周几</label><select id="setMaintDay">
+            <option value="0">周一</option><option value="1">周二</option><option value="2">周三</option>
+            <option value="3">周四</option><option value="4">周五</option><option value="5">周六</option>
+            <option value="6">周日</option></select></div>
+          <div><label>提醒时间</label><input type="time" id="setMaintTime" value="09:00"></div>
+        </div>
+
+        <div class="full modal-actions">
+          <button class="primary" id="setSave">保存设置</button>
+          <button class="ghost" id="setCancel">返回台账</button>
+        </div>
+        <div class="hint" id="setStatus"></div>
+      </div>
+    </section>
+
+    <section class="card" id="normalView">
       <div class="counter-strip" id="counterBox" hidden>
         <span class="counter-label" id="counterLabel">当前计数</span>
         <input type="number" id="counterValue">
@@ -35,6 +69,7 @@
         <div id="history"></div>
       </div>
     </section>
+    </section><!-- /normalView -->
   </div>
 </main>
 
@@ -124,6 +159,7 @@
 (function () {
   'use strict';
   var M = window.MW, $ = M.$, S = null, slug = null;
+  var view = 'normal';   // 'normal' | 'settings'
   var editingSlug = null, lastCount = null, itemOpen = {}, histOpen = false;
   var MASKS = ['projMask', 'itemMask', 'recMask', 'importMask'];
 
@@ -195,6 +231,57 @@
     $('itemId').value = ''; $('recId').value = ''; $('recFocus').value = '';
     editingSlug = null; delGuard.reset();
   }
+  // ── 设置视图 ──────────────────────────────────────────────
+  function showView(v) {
+    view = v;
+    $('settingsView').hidden = (v !== 'settings');
+    $('normalView').hidden = (v === 'settings');
+    renderSide();
+    if (v === 'settings') loadSettings();
+  }
+  function loadSettings() {
+    M.call('get_settings', {}, true).then(function (res) {
+      var st = (res && res.service_response) || res || {};
+      var mp = st.magicpush || {}, ann = st.anniversary || {}, mt = st.maintenance || {};
+      $('setPushUrl').value = mp.url || '';
+      $('setPushToken').value = mp.token || '';
+      $('setAnnOn').checked = !!ann.enabled;
+      $('setAnnDays').value = (ann.advance_days || [7,3,1]).join(',');
+      $('setAnnTime').value = ann.time || '08:00';
+      $('setMaintOn').checked = !!mt.enabled;
+      $('setMaintDay').value = (mt.weekday == null ? 6 : mt.weekday);
+      $('setMaintTime').value = mt.time || '09:00';
+      $('setStatus').textContent = '';
+    }).catch(function (e) { $('setStatus').textContent = '读取失败：' + e.message; });
+  }
+  function saveSettings() {
+    var days = String($('setAnnDays').value || '').split(',')
+      .map(function (x) { return Number(String(x).trim()); })
+      .filter(function (n) { return !isNaN(n) && n >= 0 && n <= 365; });
+    var payload = {
+      magicpush: {
+        url: $('setPushUrl').value.trim(),
+        token: $('setPushToken').value.trim(),
+        enabled: !!( $('setPushUrl').value.trim() && $('setPushToken').value.trim() )
+      },
+      anniversary: {
+        enabled: $('setAnnOn').checked,
+        advance_days: days,
+        time: $('setAnnTime').value || '08:00'
+      },
+      maintenance: {
+        enabled: $('setMaintOn').checked,
+        weekday: Number($('setMaintDay').value),
+        time: $('setMaintTime').value || '09:00'
+      }
+    };
+    $('setStatus').textContent = '保存中…';
+    M.call('set_settings', payload, true).then(function () {
+      $('setStatus').textContent = '已保存';
+      M.toast('提醒设置已保存');
+    }).catch(function (e) { $('setStatus').textContent = '保存失败：' + e.message; });
+  }
+
   function render() { renderSide(); renderCounter(); renderItems(); renderHistory(); }
   function renderSide() {
     var list = S.maintenance.projects || [];
@@ -205,7 +292,9 @@
       return '<button class="tab' + (on ? ' on' : '') + '" data-tab="' + M.esc(p.slug) + '"' +
         (on ? ' title="再点一次编辑项目"' : ' title="切换到这个项目"') + '>' +
         M.esc(p.name) + (s.due_count ? '<span class="badge">' + s.due_count + '</span>' : '') + '</button>';
-    }).join('') + '<button class="tab add primary" id="projPlus" title="新建 / 导入 / 导出">＋</button>';
+    }).join('') +
+      '<button class="tab setting' + (view === 'settings' ? ' on' : '') + '" id="projSetting" title="提醒设置">⚙ 设置</button>' +
+      '<button class="tab add primary" id="projPlus" title="新建 / 导入 / 导出">＋</button>';
   }
   function renderCounter() {
     var p = project();
@@ -551,6 +640,8 @@
   }
 
   $('projSide').onclick = function (e) {
+    var setting = e.target.closest && e.target.closest('#projSetting');
+    if (setting) { showView(view === 'settings' ? 'normal' : 'settings'); return; }
     var plus = e.target.closest && e.target.closest('#projPlus');
     if (plus) { openProjMenu(plus); return; }
     var t = e.target.closest && e.target.closest('[data-tab]'); if (!t) return;
@@ -558,6 +649,8 @@
     if (target === slug) { openForm(true); return; }
     slug = target; lastCount = null; itemOpen = {}; resetForms(); render();
   };
+  $('setSave').onclick = saveSettings;
+  $('setCancel').onclick = function () { showView('normal'); };
   $('projCounter').onchange = syncUnit;
   $('projSave').onclick = submitProject;
   $('projCancel').onclick = resetForms;
