@@ -27,12 +27,14 @@ from .const import (
     SERVICE_CLEAR_CUSTOM, SERVICE_DELETE_ITEM, SERVICE_DELETE_PROJECT,
     SERVICE_DELETE_RECORD, SERVICE_EXPORT, SERVICE_EXPORT_ALL, SERVICE_GET_SNAPSHOT,
     SERVICE_LIST_PROJECTS, SERVICE_LOG_SERVICE, SERVICE_REFRESH,
+    SERVICE_GET_SETTINGS, SERVICE_SET_SETTINGS,
     SERVICE_SET_ANNIVERSARIES, SERVICE_SET_BASELINE, SERVICE_SET_COUNTER,
     SERVICE_SET_CUSTOM, SERVICE_SET_DAY, SERVICE_SET_TODOS, SERVICE_SET_YEAR,
     SERVICE_IMPORT_PROJECTS, SERVICE_SYNC_TODOS, SERVICE_UPDATE_ITEM, SERVICE_UPDATE_PROJECT,
     SERVICE_UPDATE_RECORD, CONF_SYNC_DUE_TO_TODOS,
 )
 from .coordinator import MergedCoordinator
+from .notify import NotifyManager
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -128,6 +130,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     await coordinator.async_warm_snapshots()
     await coordinator.async_config_entry_first_refresh()
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = coordinator
+    notifier = NotifyManager(hass, coordinator)
+    hass.data.setdefault(f"{DOMAIN}_notifier", {})[entry.entry_id] = notifier
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
     async def _midnight(_now) -> None:
@@ -139,8 +143,30 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     entry.async_on_unload(
         async_track_time_change(hass, _midnight, hour=0, minute=0, second=30)
     )
+
+    async def _check_reminders(_now) -> None:
+        # 每分钟检查；具体触发时间/星期从设置读取，用户改后即时生效。
+        settings = await notifier.get_settings()
+        now = dt_util.now()
+        hhmm = f"{now.hour:02d}:{now.minute:02d}"
+        ann = settings.get("anniversary") or {}
+        if ann.get("enabled") and hhmm == ann.get("time"):
+            try:
+                await notifier.check_anniversaries()
+            except Exception as err:  # noqa: BLE001
+                _LOGGER.warning("纪念日提醒失败：%s", err)
+        mt = settings.get("maintenance") or {}
+        if mt.get("enabled") and hhmm == mt.get("time") and now.weekday() == int(mt.get("weekday", 6)):
+            try:
+                await notifier.check_maintenance()
+            except Exception as err:  # noqa: BLE001
+                _LOGGER.warning("维护提醒失败：%s", err)
+
+    entry.async_on_unload(
+        async_track_time_change(hass, _check_reminders, second=0)
+    )
     entry.async_on_unload(entry.add_update_listener(_options_updated))
-    _async_register_services(hass, coordinator)
+    _async_register_services(hass, coordinator, notifier)
     # WebSocket 命令按 handler 名做幂等注册；标志在卸载时清理，保证重新加载后可再次注册。
     if not hass.data.get(f"{DOMAIN}_ws"):
         websocket_api.async_register_command(hass, _ws_snapshot)
@@ -164,6 +190,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             _async_remove_panels(hass)
             # 清理全局标志：下次加载时重新走 WS 注册，避免标志残留导致跳过注册。
             hass.data.pop(f"{DOMAIN}_ws", None)
+        hass.data.get(f"{DOMAIN}_notifier", {}).pop(entry.entry_id, None)
     return unloaded
 
 
@@ -234,7 +261,8 @@ def _iso(value) -> str:
     return wd.parse_date(value).isoformat()
 
 
-def _async_register_services(hass: HomeAssistant, coordinator: MergedCoordinator) -> None:
+def _async_register_services(hass: HomeAssistant, coordinator: MergedCoordinator,
+                             notifier: NotifyManager | None = None) -> None:
     def register(name, handler):
         if not hass.services.has_service(DOMAIN, name):
             hass.services.async_register(DOMAIN, name, handler,
@@ -639,6 +667,12 @@ def _async_register_services(hass: HomeAssistant, coordinator: MergedCoordinator
         }
         return {"json": json.dumps(data, ensure_ascii=False, indent=2)}
 
+    async def get_settings(_call: ServiceCall) -> dict:
+        return await notifier.get_settings()
+
+    async def set_settings(call: ServiceCall) -> dict:
+        return await notifier.save_settings(dict(call.data))
+
     async def sync_todos(_call: ServiceCall) -> dict:
         added = await coordinator.async_sync_due_todos(True)
         await coordinator.async_refresh()
@@ -659,6 +693,7 @@ def _async_register_services(hass: HomeAssistant, coordinator: MergedCoordinator
         (SERVICE_UPDATE_RECORD, update_record), (SERVICE_DELETE_RECORD, delete_record),
         (SERVICE_EXPORT, export), (SERVICE_EXPORT_ALL, export_all),
         (SERVICE_SYNC_TODOS, sync_todos),
+        (SERVICE_GET_SETTINGS, get_settings), (SERVICE_SET_SETTINGS, set_settings),
     )
     for name, handler in handlers:
         register(name, handler)
