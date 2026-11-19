@@ -593,11 +593,17 @@ class TestRepo(unittest.TestCase):
         self.assertNotIn('id="projAdd"', m)
         self.assertNotIn('id="projImport"', m)
         self.assertIn("M.call('export_all'", m)
-        self.assertIn(">导入</button>", m)
-        self.assertIn(">导出</button>", m)
-        self.assertIn("data-menu-act=\"export\"", m)
+        # 导入/导出已移到设置页，＋菜单不再有这两项
+        self.assertIn('id="setExport"', m)
+        self.assertIn('id="setImport"', m)
+        self.assertIn('导出全部数据 (.json)', m)
+        self.assertNotIn('data-menu-act="export"', m)
+        self.assertNotIn('data-menu-act="import"', m)
+        # ＋ 直接新建，不再弹菜单
+        self.assertIn("if (plus) { openForm(false); return; }", m)
         css = (PKG / 'frontend' / 'shared.css').read_text(encoding='utf-8')
         self.assertIn('.proj-menu', css)
+        self.assertIn('.mt-side .tab.setting{', css)
 
     def test_import_projects_interface(self):
         init = (PKG / '__init__.py').read_text(encoding='utf-8')
@@ -834,6 +840,21 @@ class TestHolidayRollover(unittest.TestCase):
         self.assertIn('async_add_executor_job(self._load_snapshot_files', warm)
         ensure = src.split('async def _ensure_holidays')[1].split('def _holidays_for')[0]
         self.assertIn('await self.async_warm_snapshots((now.year, now.year + 1))', ensure)
+
+
+class TestSettingsNavigation(unittest.TestCase):
+    def test_setting_tab_fixed_left_and_hides_projects(self):
+        """设置按钮固定在项目栏最左，进入设置页后项目标签不显示。"""
+        m = (PKG / 'frontend' / 'maintenance.html').read_text(encoding='utf-8')
+        side = m.split('function renderSide()')[1].split('function renderCounter')[0]
+        self.assertLess(side.index('settingTab'), side.index('list.map('))
+        self.assertIn("view === 'settings'", side)
+        self.assertIn('innerHTML = settingTab; return;', side)
+
+    def test_import_returns_to_ledger(self):
+        """从设置页发起导入，成功后回台账让用户看到结果。"""
+        m = (PKG / 'frontend' / 'maintenance.html').read_text(encoding='utf-8')
+        self.assertIn("if (view === 'settings') showView('normal');", m)
 
 
 class TestWritePathSafety(unittest.TestCase):
