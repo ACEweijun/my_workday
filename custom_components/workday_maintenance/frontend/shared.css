@@ -409,3 +409,19 @@ input[type=checkbox]{width:22px;height:22px;min-height:22px;padding:0;margin:0;f
 .proj-menu button{display:block;width:100%;text-align:left;background:transparent;border:none;border-radius:7px;padding:8px 10px;min-height:36px;font-size:12px;color:var(--text)}
 .proj-menu button:hover{background:var(--soft);color:var(--act)}
 .proj-menu[hidden]{display:none}
+
+/* ── 提醒设置视图 ─────────────────────────────────────────── */
+.mt-side .tab.setting{color:var(--muted)}
+.mt-side .tab.setting.on{color:var(--accent);background:var(--accent-soft);border-color:var(--act)}
+.settings-body{padding:14px 16px}
+.settings-body>.hint{margin:0 0 14px}
+.set-group{border-top:1px solid var(--line);padding:12px 0;display:grid;grid-template-columns:1fr 1fr;gap:10px 14px;align-items:center}
+.set-group:first-of-type{border-top:0}
+.set-group>b{grid-column:1/-1;font-size:13px;font-weight:600;color:var(--text)}
+.set-group>div{display:flex;align-items:center;gap:8px;min-width:0}
+.set-group>div>label{font-size:12px;color:var(--muted);flex:none;min-width:64px}
+.set-group input[type=text],.set-group input:not([type]),.set-group input[type=password],
+.set-group input[type=time],.set-group select{flex:1;min-width:0;padding:7px 9px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--text);font-size:13px}
+.set-group input[type=checkbox]{width:18px;height:18px;accent-color:var(--accent)}
+.settings-body .modal-actions{margin-top:14px}
+@media (max-width:620px){.set-group{grid-template-columns:1fr}}
