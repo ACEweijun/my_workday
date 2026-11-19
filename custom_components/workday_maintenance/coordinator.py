@@ -18,7 +18,7 @@ from .const import (
     CONF_HOLIDAY_URL, CONF_SOON_DAYS, DEFAULT_HOLIDAY_URL, DEFAULT_SOON_DAYS,
     DOMAIN, EVENT_UPDATED, HOLIDAY_FALLBACK_URLS, SCOPE_ALL,
 )
-from .store import MergedStore
+from .store import MergedStore, SettingsStore
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -28,6 +28,8 @@ class MergedCoordinator(DataUpdateCoordinator):
         self.hass = hass
         self.entry = entry
         self.store = MergedStore(hass)
+        self.settings_store = SettingsStore(hass)
+        self._settings = None  # 启动/首次访问时加载
         self._holidays: dict[int, dict] = {}
         self._sources: dict[int, str] = {}
         self._snapshot_cache: dict[int, dict | None] = {}
