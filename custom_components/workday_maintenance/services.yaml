@@ -290,3 +290,24 @@ sync_maintenance_todos:
 export_all:
   name: "导出全部数据"
   description: "导出全部项目（含所有小项与完整维护记录）为 JSON，格式与 import_projects 导入相同，可直接用于备份/恢复。"
+
+get_settings:
+  name: 读取提醒设置
+  description: 返回魔法推送配置、纪念日与维护提醒规则（含已推送记录）。
+
+set_settings:
+  name: 保存提醒设置
+  description: 保存魔法推送地址/令牌与提醒规则。字段按需传入，未传的保持不变。
+  fields:
+    magicpush:
+      name: 魔法推送配置
+      description: 对象：url、token、enabled
+      example: '{url:https://push.example.com,token:xxx,enabled:true}'
+    anniversary:
+      name: 纪念日提醒
+      description: 对象：enabled、advance_days（天数数组）、time（HH:MM）
+      example: '{enabled:true,advance_days:[7,3,1],time:08:00}'
+    maintenance:
+      name: 维护提醒
+      description: 对象：enabled、weekday（0=周一..6=周日）、time（HH:MM）
+      example: '{enabled:true,weekday:6,time:09:00}'
