@@ -5,6 +5,12 @@ DOMAIN = "workday_maintenance"
 NAME = "workday_maintenance"
 STORAGE_KEY = "workday_maintenance.merged"
 STORAGE_VERSION = 1
+# 设置独立存储：提醒规则 / magicpush 配置 / 推送去重，不进业务存档
+SETTINGS_KEY = "workday_maintenance.settings"
+SETTINGS_VERSION = 1
+# 新增服务名
+SERVICE_GET_SETTINGS = "get_settings"
+SERVICE_SET_SETTINGS = "set_settings"
 
 PANEL_URL = "/workday_maintenance"
 PANEL_WORKDAY = "workday.html"
