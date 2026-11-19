@@ -13,6 +13,7 @@ from homeassistant.util import dt as dt_util
 
 from . import maintenance as mnt
 from . import workday as wd
+from . import push_rule as pr
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -48,8 +49,10 @@ class NotifyManager:
 
     # ── 去重 ─────────────────────────────────────────────────
     @staticmethod
-    def _day_key(prefix: str, target: str, today: dt.date) -> str:
-        return f"{prefix}:{target}:{today.isoformat()}"
+    def _day_key(prefix: str, target: str, today: dt.date, rule: dict | None = None) -> str:
+        # 带规则指纹：用户改了提醒规则后，同一天会按新规则重新推送。
+        fp = pr.push_fingerprint(rule) if rule else "none"
+        return f"{prefix}:{target}:{fp}:{today.isoformat()}"
 
     async def _should_send(self, key: str, today: dt.date) -> bool:
         settings = await self.store.async_load()
@@ -89,26 +92,32 @@ class NotifyManager:
             return False
 
     # ── 纪念日：提前 N 天 ────────────────────────────────────
-    async def check_anniversaries(self) -> int:
+    async def check_anniversaries(self, now: dt.datetime | None = None) -> int:
+        """逐条纪念日按各自规则判断是否推送（规则可覆盖时间/提前天数）。"""
         settings = await self.store.async_load()
         cfg = settings.get("anniversary") or {}
         if not cfg.get("enabled"):
             return 0
-        advances = [int(x) for x in (cfg.get("advance_days") or [])]
-        if not advances:
-            return 0
+        now = now or dt_util.now()
+        today = now.date()
+        hhmm = f"{now.hour:02d}:{now.minute:02d}"
         raw = await self.coordinator.store.async_load()
         anniversaries = (raw.get("workday") or {}).get("anniversaries") or []
-        today = dt_util.now().date()
         sent = 0
         for a in anniversaries:
+            rule = pr.resolve_push(cfg, a)
+            if not rule or rule.get("time") != hhmm:
+                continue
+            advances = [int(x) for x in (rule.get("advance_days") or [])]
+            if not advances:
+                continue
             day = wd.anniversary_next(a, today)
             if not day:
                 continue
             days = (day - today).days
             if days not in advances:
                 continue
-            key = self._day_key("ann", str(a.get("id") or a.get("name")), today)
+            key = self._day_key("ann", str(a.get("id") or a.get("name")), today, rule)
             if not await self._should_send(key, today):
                 continue
             title = "纪念日提醒"
@@ -119,26 +128,42 @@ class NotifyManager:
         return sent
 
     # ── 维护项：按到期状态汇总 ───────────────────────────────
-    async def check_maintenance(self) -> int:
+    async def check_maintenance(self, now: dt.datetime | None = None) -> int:
+        """按小项各自的规则逐条提醒（时间/星期可覆盖全局）。"""
         settings = await self.store.async_load()
         cfg = settings.get("maintenance") or {}
         if not cfg.get("enabled"):
             return 0
+        now = now or dt_util.now()
+        today = now.date()
+        hhmm = f"{now.hour:02d}:{now.minute:02d}"
         raw = await self.coordinator.store.async_load()
         projects = (raw.get("maintenance") or {}).get("projects") or []
-        today = dt_util.now().date()
-        due = mnt.all_due_items(projects, today, self.coordinator.soon_days)
-        if not due:
-            return 0
-        key = self._day_key("maint", "all", today)
-        if not await self._should_send(key, today):
-            return 0
-        lines = [f"· {d['project']} / {d['name']}" for d in due[:12]]
-        if len(due) > 12:
-            lines.append(f"…… 另有 {len(due) - 12} 项")
-        title = f"维护提醒 · {len(due)} 项待处理"
-        content = "\n".join(lines)
-        if await self._push(title, content):
-            await self._mark_sent(key, today)
-            return 1
-        return 0
+        states = []
+        for project in projects:
+            summary = mnt.project_summary(project, today, self.coordinator.soon_days)
+            for st in summary["items"]:
+                if st["status"] in (mnt.STATUS_DUE, mnt.STATUS_SOON):
+                    states.append((project, st))
+        sent = 0
+        for project, st in states:
+            # 找到原始 item 以读取 push 字段
+            item = next((i for i in project.get("items", []) if i.get("id") == st["id"]), None)
+            rule = pr.resolve_push(cfg, item or {})
+            if not rule or rule.get("time") != hhmm:
+                continue
+            wd = rule.get("weekday")
+            if wd is not None and not isinstance(wd, bool) and now.weekday() != int(wd):
+                continue
+            title = "维护提醒"
+            content = f"{project.get('name')} / {st['name']} · {st['status']}"
+            if st.get("remaining_days") is not None:
+                rd = st["remaining_days"]
+                content += f" · {'已超期 ' + str(abs(rd)) + ' 天' if rd <= 0 else '还剩 ' + str(rd) + ' 天'}"
+            key = self._day_key("maint", st["id"], today, rule)
+            if not await self._should_send(key, today):
+                continue
+            if await self._push(title, content):
+                await self._mark_sent(key, today)
+                sent += 1
+        return sent
