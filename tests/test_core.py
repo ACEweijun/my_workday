@@ -842,6 +842,29 @@ class TestHolidayRollover(unittest.TestCase):
         self.assertIn('await self.async_warm_snapshots((now.year, now.year + 1))', ensure)
 
 
+class TestViewDomStructure(unittest.TestCase):
+    def test_normal_view_wraps_items_and_history(self):
+        """normalView 必须包住小项与历史区，否则切设置页时它们不会隐藏。"""
+        m = (PKG / 'frontend' / 'maintenance.html').read_text(encoding='utf-8')
+        # 用栈验证 div/section 嵌套：items 与 history 打开时 normalView 必须在栈里
+        import re
+        main = m.split('<div class="mt-main">')[1].split('</main>')[0]
+        stack, inside_ok = [], []
+        for mo in re.finditer(r'<(/?)(div|section)\b([^>]*)>', main):
+            close, tag, attrs = mo.groups()
+            idm = re.search(r'id="([^"]+)"', attrs)
+            ident = idm.group(1) if idm else None
+            if not close:
+                if ident in ('items', 'history'):
+                    inside_ok.append(any(x == 'normalView' for x in stack))
+                stack.append(ident or tag)
+            elif stack:
+                stack.pop()
+        self.assertTrue(inside_ok, '没找到 items/history 区')
+        self.assertTrue(all(inside_ok), '小项或历史区不在 normalView 内，切设置页时会漏显')
+        self.assertEqual(len(stack), 0, '存在未闭合标签')
+
+
 class TestSettingsNavigation(unittest.TestCase):
     def test_setting_tab_fixed_left_and_hides_projects(self):
         """设置按钮固定在项目栏最左，进入设置页后项目标签不显示。"""
