@@ -292,10 +292,9 @@
 
   function render() { renderSide(); renderCounter(); renderItems(); renderHistory(); }
   function renderSide() {
-    // 设置按钮固定在最左，用独立底色与项目标签区分；进入设置视图后隐藏项目标签和＋。
+    // 设置按钮固定在最左，用独立底色与项目标签区分；项目标签始终显示（设置视图也一样）。
     var settingTab = '<button class="tab setting' + (view === 'settings' ? ' on' : '') +
       '" id="projSetting" title="提醒设置与数据管理">⚙ 设置</button>';
-    if (view === 'settings') { $('projSide').innerHTML = settingTab; return; }
     var list = S.maintenance.projects || [];
     $('projHint').hidden = list.length > 0;
     $('projSide').innerHTML = settingTab + list.map(function (p) {
@@ -658,8 +657,10 @@
     if (plus) { openForm(false); return; }
     var t = e.target.closest && e.target.closest('[data-tab]'); if (!t) return;
     var target = t.dataset.tab;
-    if (target === slug) { openForm(true); return; }
-    slug = target; lastCount = null; itemOpen = {}; resetForms(); render();
+    if (target === slug) { if (view === 'settings') showView('normal'); else openForm(true); return; }
+    slug = target; lastCount = null; itemOpen = {}; resetForms();
+    if (view === 'settings') showView('normal');  // 从设置页点项目：回到该项目台账
+    render();
   };
   $('setSave').onclick = saveSettings;
   $('setCancel').onclick = function () { showView('normal'); };
