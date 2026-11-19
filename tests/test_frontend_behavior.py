@@ -236,5 +236,58 @@ class TestFrontendBehavior(unittest.TestCase):
         self.assertIn('OK', self.run_node(script))
 
 
+    def test_token_from_auth_all_shapes(self):
+        """手机 Companion App 的 token 在 auth.data.access_token，必须能取到。"""
+        script = self._env_setup() + '''
+            const src = require('fs').readFileSync(DIR+'/shared.js','utf8');
+            const m=src.match(/function tokenFromAuth\\(x\\) \\{[\\s\\S]*?\\n  \\}/);
+            if(!m){console.log('FAIL no tokenFromAuth');return;}
+            const tokenFromAuth=eval('('+m[0]+')');
+            const cases=[
+              [{auth:{data:{access_token:'APP'}}}, 'APP'],          // Companion App（关键）
+              [{auth:{accessToken:'WEB'}}, 'WEB'],                   // 网页端
+              [{auth:{access_token:'ALT'}}, 'ALT'],
+              [{options:{auth:{accessToken:'OLD'}}}, 'OLD'],
+              [{options:{authToken:'LL'}}, 'LL'],
+              [{foo:1}, null]
+            ];
+            let ok=true;
+            cases.forEach(([obj,want])=>{const got=tokenFromAuth(obj);if(got!==want){ok=false;console.log('BAD '+JSON.stringify(obj)+' -> '+got)}});
+            console.log(ok?'OK':'FAIL');
+        '''
+        self.assertIn('OK', self.run_node(script))
+
+
+    def test_settings_view_toggle(self):
+        """设置按钮切换视图：设置页/正常页互斥，保存走 set_settings 服务。"""
+        script = self._env_setup() + '''
+            const src=require('fs').readFileSync(DIR+'/maintenance.html','utf8');
+            const checks=[
+              src.includes('id="settingsView"'), src.includes('id="normalView"'),
+              src.includes('function showView(v)'),
+              src.includes("$('settingsView').hidden = (v !== 'settings')"),
+              src.includes("$('normalView').hidden = (v === 'settings')"),
+              src.includes("e.target.closest('#projSetting')"),
+              src.includes("M.call('set_settings', payload, true)"),
+              src.includes("M.call('get_settings', {}, true)")
+            ];
+            console.log(checks.every(Boolean)?'OK':'FAIL '+JSON.stringify(checks));
+        '''
+        self.assertIn('OK', self.run_node(script))
+
+    def test_demo_settings_roundtrip(self):
+        """本地预览：设置写入后读回一致。"""
+        script = self._env_setup() + '''
+            (async()=>{
+              const M=w.MW;
+              await M.call('set_settings',{anniversary:{enabled:true,advance_days:[5,2],time:'07:30'}});
+              const r=(await M.call('get_settings',{},true)).service_response;
+              const a=r.anniversary;
+              console.log(a.enabled&&a.time==='07:30'&&a.advance_days.join()==='5,2'?'OK':'FAIL '+JSON.stringify(a));
+            })().catch(e=>console.log('ERR '+e.message));
+        '''
+        self.assertIn('OK', self.run_node(script))
+
+
 if __name__ == '__main__':
     unittest.main()
