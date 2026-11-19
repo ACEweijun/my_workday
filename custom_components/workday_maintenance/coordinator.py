@@ -37,27 +37,33 @@ class MergedCoordinator(DataUpdateCoordinator):
         super().__init__(hass, _LOGGER, name=DOMAIN)
 
     async def async_warm_snapshots(self, years=None):
-        """启动阶段在线程池预读节假日快照，避免事件循环内同步 IO。"""
+        """在线程池预读节假日快照（启动或跨年补年份），避免事件循环内同步 IO。"""
         if years is None:
             now = dt_util.now().date()
             years = (now.year, now.year + 1)
+        # 只补缓存里还没有的年份；已有年份不重复读盘。
+        missing = [y for y in years if y not in self._snapshot_cache]
+        if not missing:
+            return
+        loaded = await self.hass.async_add_executor_job(self._load_snapshot_files, missing)
+        self._snapshot_cache.update(loaded)
 
-        def load():
-            out = {}
-            for year in years:
-                path = Path(__file__).parent / "holidays_snapshot" / f"{year}.json"
-                if not path.is_file():
-                    out[year] = None
-                    continue
-                try:
-                    payload = json.loads(path.read_text(encoding="utf-8"))
-                    ok, parsed = self._payload_has_data(payload, year)
-                    out[year] = parsed if ok else None
-                except Exception as err:  # noqa: BLE001
-                    _LOGGER.debug("读取 %s 年内置节假日快照失败：%s", year, err)
-                    out[year] = None
-            return out
-        self._snapshot_cache.update(await self.hass.async_add_executor_job(load))
+    def _load_snapshot_files(self, years) -> dict:
+        """线程池内读多个年份的快照文件。"""
+        out = {}
+        for year in years:
+            path = Path(__file__).parent / "holidays_snapshot" / f"{year}.json"
+            if not path.is_file():
+                out[year] = None
+                continue
+            try:
+                payload = json.loads(path.read_text(encoding="utf-8"))
+                ok, parsed = self._payload_has_data(payload, year)
+                out[year] = parsed if ok else None
+            except Exception as err:  # noqa: BLE001
+                _LOGGER.debug("读取 %s 年内置节假日快照失败：%s", year, err)
+                out[year] = None
+        return out
 
     @property
     def soon_days(self) -> int:
@@ -97,6 +103,9 @@ class MergedCoordinator(DataUpdateCoordinator):
         return self._snapshot_cache.get(year)
 
     async def _ensure_holidays(self, raw: dict, now: dt.date) -> None:
+        # 跨年补偿：每次刷新都确保"当年+次年"的快照已进缓存（缺则线程池补读）。
+        # 集成常驻跨年后，新年份不会在启动时预热，必须动态补。
+        await self.async_warm_snapshots((now.year, now.year + 1))
         overrides = raw["workday"].get("year_override") or {}
         for year in (now.year, now.year + 1):
             text = overrides.get(str(year)) or overrides.get(year)
@@ -152,11 +161,10 @@ class MergedCoordinator(DataUpdateCoordinator):
         holidays = self._holidays_for(now.year)
         custom_work = set(raw["workday"].get("custom_work") or [])
         custom_rest = set(raw["workday"].get("custom_rest") or [])
+        # 读路径绝不写盘：过期 todo 只在内存里过滤掉，持久化交给持锁的 async_mutate。
+        # 否则刷新与用户写入并发时，刷新会拿旧数据回存，静默吞掉用户刚写的内容。
         todos = wd.clean_todos(raw["workday"].get("todos") or [], now)
         anniversaries = raw["workday"].get("anniversaries") or []
-        if todos != raw["workday"].get("todos"):
-            raw["workday"]["todos"] = todos
-            await self.store.async_save(raw)
 
         today_work, today_label = wd.classify(now, holidays, custom_work, custom_rest)
         tomorrow_work, _ = wd.classify(now + dt.timedelta(days=1), holidays,
@@ -210,9 +218,16 @@ class MergedCoordinator(DataUpdateCoordinator):
         return {"sources": dict(self._sources)}
 
     async def async_mutate(self, scope: str, fn):
+        # 所有写盘都收敛在这把锁内：load -> fn -> 清理 -> save -> refresh。
+        # 读路径(_async_update_data)只读不写，杜绝并发刷新覆盖用户写入。
         async with self._lock:
             raw = await self.store.async_load()
             result = fn(raw)
+            # 顺带把过期 todo 的清理结果落盘（读路径只过滤不保存）
+            cleaned = wd.clean_todos(raw["workday"].get("todos") or [],
+                                     dt_util.now().date())
+            if cleaned != raw["workday"].get("todos"):
+                raw["workday"]["todos"] = cleaned
             await self.store.async_save(raw)
             await self.async_refresh()
             self.hass.bus.async_fire(EVENT_UPDATED, {"scope": scope})
