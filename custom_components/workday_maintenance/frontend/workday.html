@@ -84,6 +84,7 @@
         <option value="none">不重复</option><option value="week">每周</option>
         <option value="month">每月</option><option value="quarter">每季度</option>
         <option value="year">每年</option></select></div>
+      <div class="full" id="annPushSlot"></div>
       <div class="full"><button class="primary" id="annSave">保存</button>
         <button class="ghost" id="annCancel">取消</button></div>
     </div>
@@ -748,6 +749,9 @@
     $('annName').value = a ? a.name : '';
     $('annDate').value = a ? annDate(a) : (date || S.today);
     $('annRepeat').value = a ? annType(a) : 'year';
+    var slot = $('annPushSlot');
+    if (slot && !slot.firstChild) { slot.innerHTML = M.pushFormHtml('ann', false); M.bindPushForm('ann'); }
+    M.fillPushForm('ann', a && a.push);
     $('annName').focus();
   }
   function closeAnn() { $('annMask').hidden = true; editingAnn = null; }
@@ -757,13 +761,14 @@
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) { M.toast('请用日期控件选择日期', true); return; }
     var rep = $('annRepeat').value;
     if (!ANN_TYPES[rep]) rep = 'none';
+    var push = M.readPushForm('ann');
     var next = (S.workday.anniversaries || []).slice();
     if (editingAnn) {
       next = next.map(function (a) {
-        return a.id === editingAnn ? Object.assign({}, a, { name: name, date: date, repeat: rep }) : a;
+        return a.id === editingAnn ? Object.assign({}, a, { name: name, date: date, repeat: rep, push: push }) : a;
       });
     } else {
-      next.push({ id: 'a' + Date.now().toString(36), name: name, date: date, repeat: rep });
+      next.push({ id: 'a' + Date.now().toString(36), name: name, date: date, repeat: rep, push: push });
     }
     closeAnn();
     write('set_anniversaries', { anniversaries: next });
