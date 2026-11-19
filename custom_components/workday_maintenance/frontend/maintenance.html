@@ -127,6 +127,7 @@
       <div><label>间隔天数</label><input type="number" id="itemDays" value="180"></div>
       <div id="itemIntervalBox" hidden><label>间隔计数（可留空）</label><input type="number" id="itemInterval" placeholder="10000"></div>
       <div><label>备注</label><input id="itemNote"></div>
+      <div class="full" id="itemPushSlot"></div>
       <div class="full modal-actions"><button class="primary" id="itemSave">保存</button>
         <button class="ghost danger" id="itemDelete" hidden>删除这个小项</button>
         <button class="ghost" id="itemCancel">取消</button></div>
@@ -524,6 +525,9 @@
     $('itemIntervalBox').hidden = !p.need_counter;
     $('itemInterval').value = p.need_counter && i && i.interval_counter != null ? i.interval_counter : '';
     $('itemNote').value = i ? (i.note || '') : '';
+    var slot = $('itemPushSlot');
+    if (slot && !slot.firstChild) { slot.innerHTML = M.pushFormHtml('item', true); M.bindPushForm('item'); }
+    M.fillPushForm('item', i && i.push);
     $('itemDelete').hidden = !id;
     $('itemDelete').textContent = '删除这个小项';
     $('itemName').focus();
@@ -689,7 +693,8 @@
   $('itemSave').onclick = function () {
     var id = $('itemId').value;
     var data = { slug: slug, name: $('itemName').value.trim(),
-      interval_days: Number($('itemDays').value), note: $('itemNote').value };
+      interval_days: Number($('itemDays').value), note: $('itemNote').value,
+      push: M.readPushForm('item') };
     if ($('itemInterval').value !== '') data.interval_counter = Number($('itemInterval').value);
     if (!data.name) { M.toast('维护内容不能为空', true); return; }
     if (String($('itemDays').value == null ? '' : $('itemDays').value).trim() === '') { M.toast('间隔天数要填', true); return; }
