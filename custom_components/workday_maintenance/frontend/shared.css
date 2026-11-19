@@ -425,3 +425,10 @@ input[type=checkbox]{width:22px;height:22px;min-height:22px;padding:0;margin:0;f
 .set-group input[type=checkbox]{width:18px;height:18px;accent-color:var(--accent)}
 .settings-body .modal-actions{margin-top:14px}
 @media (max-width:620px){.set-group{grid-template-columns:1fr}}
+
+/* ── 单条提醒规则编辑框 ───────────────────────────────────── */
+.push-box{border-top:1px dashed var(--line);padding-top:10px;margin-top:4px;display:grid;gap:8px}
+.push-box>div{display:flex;align-items:center;gap:8px}
+.push-box label{font-size:12px;color:var(--muted);min-width:64px;flex:none}
+.push-box select,.push-box input{flex:1;min-width:0;padding:5px 8px;border:1px solid var(--line);border-radius:7px;background:var(--surface);color:var(--text);font-size:12px}
+.push-box .push-custom{border-left:2px solid var(--accent-soft);padding-left:10px;margin-left:2px;display:grid;gap:6px}
