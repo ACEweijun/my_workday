@@ -411,8 +411,10 @@ input[type=checkbox]{width:22px;height:22px;min-height:22px;padding:0;margin:0;f
 .proj-menu[hidden]{display:none}
 
 /* ── 提醒设置视图 ─────────────────────────────────────────── */
-.mt-side .tab.setting{color:var(--muted)}
-.mt-side .tab.setting.on{color:var(--accent);background:var(--accent-soft);border-color:var(--act)}
+/* 设置按钮：独立中性底色，与项目标签的强调蓝明确区分 */
+.mt-side .tab.setting{background:var(--soft);color:var(--text);border-color:var(--line);font-weight:600;letter-spacing:.02em}
+.mt-side .tab.setting:hover{background:var(--inset)}
+.mt-side .tab.setting.on{background:var(--accent-soft);color:var(--accent);border-color:var(--act)}
 .settings-body{padding:14px 16px}
 .settings-body>.hint{margin:0 0 14px}
 .set-group{border-top:1px solid var(--line);padding:12px 0;display:grid;grid-template-columns:1fr 1fr;gap:10px 14px;align-items:center}
