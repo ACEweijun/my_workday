@@ -825,6 +825,30 @@ class TestItemStatusDisplay(unittest.TestCase):
         self.assertIn('.mt-item.st-unset::before{opacity:.3}', css)
 
 
+class TestHolidayRollover(unittest.TestCase):
+    def test_cross_year_snapshot_refresh(self):
+        """跨年补年份：每次刷新确保当年+次年快照在缓存，缺则线程池补读。"""
+        src = (PKG / 'coordinator.py').read_text(encoding='utf-8')
+        warm = src.split('async def async_warm_snapshots')[1].split('@property')[0]
+        self.assertIn('missing = [y for y in years if y not in self._snapshot_cache]', warm)
+        self.assertIn('async_add_executor_job(self._load_snapshot_files', warm)
+        ensure = src.split('async def _ensure_holidays')[1].split('def _holidays_for')[0]
+        self.assertIn('await self.async_warm_snapshots((now.year, now.year + 1))', ensure)
+
+
+class TestWritePathSafety(unittest.TestCase):
+    def test_read_path_never_writes(self):
+        """读路径零写盘：刷新不能覆盖用户并发写入（P0 竞态契约）。"""
+        src = (PKG / 'coordinator.py').read_text(encoding='utf-8')
+        read_fn = src.split('async def _async_update_data')[1].split('async def async_force_refresh')[0]
+        self.assertNotIn('async_save', read_fn, '读路径不得写盘')
+        self.assertIn('只在内存里过滤掉', read_fn)
+        write_fn = src.split('async def async_mutate')[1].split('async def async_sync_due_todos')[0]
+        self.assertIn('async with self._lock', write_fn)
+        self.assertIn('await self.store.async_save(raw)', write_fn)
+        self.assertIn('cleaned = wd.clean_todos', write_fn)
+
+
 class TestReminderSettings(unittest.TestCase):
     def test_settings_store_isolated_from_archive(self):
         """提醒设置存独立 key，不进导出存档（密钥/去重不随存档外带）。"""
@@ -851,16 +875,19 @@ class TestReminderSettings(unittest.TestCase):
         n = (PKG / 'notify.py').read_text(encoding='utf-8')
         for token in ('class NotifyManager', 'async def check_anniversaries',
                       'async def check_maintenance', 'wd.anniversary_next',
-                      'mnt.all_due_items', '/api/push', 'Authorization',
+                      'mnt.project_summary', 'pr.resolve_push', 'push_fingerprint',
+                      '/api/push', 'Authorization',
                       'def _should_send', 'def _mark_sent'):
             self.assertIn(token, n)
 
-    def test_schedule_reads_settings_time(self):
+    def test_schedule_scans_every_minute(self):
+        """细项可覆盖时间，调度器不再按全局时间拦截，每分钟扫描下放判断。"""
         init = (PKG / '__init__.py').read_text(encoding='utf-8')
         self.assertIn('async def _check_reminders', init)
-        self.assertIn('hhmm == ann.get("time")', init)
-        self.assertIn('hhmm == mt.get("time")', init)
-        self.assertIn('now.weekday() == int(mt.get("weekday", 6))', init)
+        self.assertIn('await notifier.check_anniversaries(now)', init)
+        self.assertIn('await notifier.check_maintenance(now)', init)
+        self.assertIn('get("anniversary") or {}).get("enabled")', init)
+        self.assertIn('get("maintenance") or {}).get("enabled")', init)
         self.assertIn('async_track_time_change(hass, _check_reminders, second=0)', init)
 
 
