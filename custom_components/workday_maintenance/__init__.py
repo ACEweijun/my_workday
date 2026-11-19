@@ -35,6 +35,7 @@ from .const import (
 )
 from .coordinator import MergedCoordinator
 from .notify import NotifyManager
+from . import push_rule as _pr
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -145,20 +146,18 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     )
 
     async def _check_reminders(_now) -> None:
-        # 每分钟检查；具体触发时间/星期从设置读取，用户改后即时生效。
+        # 每分钟扫描。时间/星期判断已下放到各检查函数内部逐项做：
+        # 因为细项可覆盖全局时间，调度器不能再按全局时间提前拦截。
         settings = await notifier.get_settings()
         now = dt_util.now()
-        hhmm = f"{now.hour:02d}:{now.minute:02d}"
-        ann = settings.get("anniversary") or {}
-        if ann.get("enabled") and hhmm == ann.get("time"):
+        if (settings.get("anniversary") or {}).get("enabled"):
             try:
-                await notifier.check_anniversaries()
+                await notifier.check_anniversaries(now)
             except Exception as err:  # noqa: BLE001
                 _LOGGER.warning("纪念日提醒失败：%s", err)
-        mt = settings.get("maintenance") or {}
-        if mt.get("enabled") and hhmm == mt.get("time") and now.weekday() == int(mt.get("weekday", 6)):
+        if (settings.get("maintenance") or {}).get("enabled"):
             try:
-                await notifier.check_maintenance()
+                await notifier.check_maintenance(now)
             except Exception as err:  # noqa: BLE001
                 _LOGGER.warning("维护提醒失败：%s", err)
 
@@ -420,6 +419,8 @@ def _async_register_services(hass: HomeAssistant, coordinator: MergedCoordinator
                 "last_date": str(it.get("last_date")) if it.get("last_date") else None,
                 "last_counter": _num(it.get("last_counter")),
                 "note": str(it.get("note") or ""),
+                # 方案甲：细项提醒规则随存档往返，缺省 inherit 不影响旧存档。
+                "push": _pr.normalize_push(it.get("push")),
             }
 
         def mutate(raw):
@@ -540,6 +541,7 @@ def _async_register_services(hass: HomeAssistant, coordinator: MergedCoordinator
                 "interval_counter": call.data.get("interval_counter"),
                 "last_date": None, "last_counter": None,
                 "note": str(call.data.get("note") or ""),
+                "push": _pr.normalize_push(call.data.get("push")),
             }
             project["items"].append(item)
             return item["id"]
@@ -552,9 +554,9 @@ def _async_register_services(hass: HomeAssistant, coordinator: MergedCoordinator
 
         def mutate(raw):
             item = _item(_project(raw, slug), item_id)
-            for key in ("name", "interval_days", "interval_counter", "note"):
+            for key in ("name", "interval_days", "interval_counter", "note", "push"):
                 if key in call.data:
-                    item[key] = call.data[key]
+                    item[key] = _pr.normalize_push(call.data[key]) if key == "push" else call.data[key]
 
         await coordinator.async_mutate(SCOPE_MAINTENANCE, mutate)
         return {"slug": slug, "item_id": item_id}
