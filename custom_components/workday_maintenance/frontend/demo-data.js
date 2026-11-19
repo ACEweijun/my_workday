@@ -126,6 +126,14 @@
       + dueItems.filter(function (d) { return d.status === 'due'; }).length;
   }
 
+  // ---------- 提醒设置（本地预览内存态）----------
+  var DEMO_SETTINGS = {
+    magicpush: { url: '', token: '', enabled: false },
+    anniversary: { enabled: false, advance_days: [7,3,1], time: '08:00' },
+    maintenance: { enabled: false, weekday: 6, time: '09:00' },
+    sent: {}
+  };
+
   // ---------- 完整快照 ----------
   var SNAP = {
     today: TODAY,
@@ -181,6 +189,13 @@
     var result = null;
     var w = SNAP.workday, m = SNAP.maintenance, p, it;
     switch (service) {
+      case 'get_settings': result = JSON.parse(JSON.stringify(DEMO_SETTINGS)); break;
+      case 'set_settings':
+        ['magicpush','anniversary','maintenance'].forEach(function (sec) {
+          if (data[sec] && typeof data[sec] === 'object')
+            Object.assign(DEMO_SETTINGS[sec], data[sec]);
+        });
+        result = JSON.parse(JSON.stringify(DEMO_SETTINGS)); break;
       case 'set_todos': w.todos = clone(data.todos || []); break;
       case 'set_anniversaries': w.anniversaries = clone(data.anniversaries || []); w.next_event = null; break;
       case 'set_day':
