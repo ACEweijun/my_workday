@@ -302,6 +302,56 @@ window.MW = (function () {
     toast('正在加载数据…');
     connect();
   }
+  // ---- 单条提醒规则编辑（纪念日/维护小项共用）----
+  // prefix 如 "ann" / "item"，生成一组 id 为 {prefix}PushMode 等的表单元素。
+  function pushFormHtml(prefix, showWeekday) {
+    var wdRow = showWeekday
+      ? '<div><label>每周</label><select id="' + prefix + 'PushWeekday">' +
+        ['一','二','三','四','五','六','日'].map(function (d, i) {
+          return '<option value="' + i + '">周' + d + '</option>';
+        }).join('') + '</select></div>'
+      : '';
+    return '<div class="push-box" id="' + prefix + 'PushBox">' +
+      '<div><label>提醒</label><select id="' + prefix + 'PushMode">' +
+      '<option value="inherit">跟随全局默认</option>' +
+      '<option value="custom">单独设置</option>' +
+      '<option value="off">不提醒</option></select></div>' +
+      '<div class="push-custom" id="' + prefix + 'PushCustom" hidden>' +
+      '<div><label>提前天数</label><input id="' + prefix + 'PushDays" placeholder="7,3,1"></div>' +
+      '<div><label>提醒时间</label><input type="time" id="' + prefix + 'PushTime" value="08:00"></div>' +
+      wdRow + '</div></div>';
+  }
+  function bindPushForm(prefix) {
+    var sel = $(prefix + 'PushMode');
+    if (!sel) return;
+    sel.onchange = function () {
+      var box = $(prefix + 'PushCustom');
+      if (box) box.hidden = sel.value !== 'custom';
+    };
+  }
+  function fillPushForm(prefix, push) {
+    var p = push || {}, mode = p.mode || 'inherit';
+    var sel = $(prefix + 'PushMode'); if (sel) sel.value = mode;
+    if ($(prefix + 'PushDays')) $(prefix + 'PushDays').value = (p.advance_days || []).join(',');
+    if ($(prefix + 'PushTime')) $(prefix + 'PushTime').value = p.time || '08:00';
+    if ($(prefix + 'PushWeekday') && p.weekday != null) $(prefix + 'PushWeekday').value = p.weekday;
+    var box = $(prefix + 'PushCustom'); if (box) box.hidden = mode !== 'custom';
+  }
+  function readPushForm(prefix) {
+    var sel = $(prefix + 'PushMode');
+    var mode = sel ? sel.value : 'inherit';
+    var out = { mode: mode };
+    if (mode === 'custom') {
+      var days = String(($(prefix + 'PushDays') || {}).value || '').split(',')
+        .map(function (x) { return Number(String(x).trim()); })
+        .filter(function (x) { return !isNaN(x) && x >= 0 && x <= 365; });
+      out.advance_days = days;
+      out.time = (($(prefix + 'PushTime') || {}).value || '08:00');
+      if ($(prefix + 'PushWeekday')) out.weekday = Number($(prefix + 'PushWeekday').value);
+    }
+    return out;
+  }
+
   // ---- 页面公共助手（workday / maintenance 共用，避免重复实现分叉）----
 
   // 日期输入框：点整行任意位置都能弹出系统日历（原生日历图标铺满 + showPicker 双保险）。
@@ -375,6 +425,8 @@ window.MW = (function () {
     $: $, esc: esc, call: call, snapshot: snapshot, onUpdate: onUpdate,
     toast: toast, setReady: setReady, today: today, dateOf: dateOf,
     dayDiff: dayDiff, start: start, broadcast: broadcast, isHA: isHA,
-    bindDateFields: bindDateFields, createLoader: createLoader, createArmDel: createArmDel
+    bindDateFields: bindDateFields, createLoader: createLoader, createArmDel: createArmDel,
+    pushFormHtml: pushFormHtml, bindPushForm: bindPushForm,
+    fillPushForm: fillPushForm, readPushForm: readPushForm
   };
 })();
