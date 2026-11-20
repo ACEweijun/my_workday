@@ -91,6 +91,27 @@ class NotifyManager:
             _LOGGER.warning("magicpush 推送异常：%s", err)
             return False
 
+    async def test_push(self, url: str, token: str) -> dict:
+        """用临时传入的配置发测试消息，返回可展示给用户的结果。"""
+        if not url or not token:
+            return {"ok": False, "error": "请先填服务地址和接口 Token"}
+        endpoint = url.rstrip("/") + "/api/push"
+        payload = {"title": "workday_maintenance 测试", "content": "如果你收到这条消息，说明魔法推送配置正确。",
+                   "type": "text"}
+        headers = {"Authorization": "Bearer " + token, "Content-Type": "application/json"}
+        try:
+            session = async_get_clientsession(self.hass)
+            async with session.post(endpoint, json=payload, headers=headers,
+                                    timeout=10) as resp:
+                text = await resp.text()
+                if resp.status == 200:
+                    return {"ok": True, "detail": f"推送成功（HTTP {resp.status}）"}
+                _LOGGER.warning("测试推送失败 %s: %s", resp.status, text[:200])
+                return {"ok": False, "error": f"HTTP {resp.status}：{text[:120]}"}
+        except Exception as err:  # noqa: BLE001
+            _LOGGER.warning("测试推送异常：%s", err)
+            return {"ok": False, "error": f"连接失败：{type(err).__name__} {str(err)[:120]}"}
+
     # ── 纪念日：提前 N 天 ────────────────────────────────────
     async def check_anniversaries(self, now: dt.datetime | None = None) -> int:
         """逐条纪念日按各自规则判断是否推送（规则可覆盖时间/提前天数）。"""
