@@ -211,12 +211,12 @@ class TestRepo(unittest.TestCase):
     def test_handlers_register_every_declared_service(self):
         """结构化契约：handlers 元组必须覆盖 const 里声明的每个服务，且无遗漏文档。"""
         c = (PKG / 'const.py').read_text(encoding='utf-8')
-        init = (PKG / '__init__.py').read_text(encoding='utf-8')
+        services = (PKG / 'services.py').read_text(encoding='utf-8')
         svc = (PKG / 'services.yaml').read_text(encoding='utf-8')
         declared = dict(re.findall(r'^SERVICE_([A-Z_]+)\s*=\s*"([^"]+)"', c, re.M))
         doc = set(re.findall(r'^([a-z_]+):\s*$', svc, re.M))
         # 从 handlers 元组里提取实际注册的常量名
-        registered = set(re.findall(r'\(SERVICE_([A-Z_]+),\s*\w+\)', init))
+        registered = set(re.findall(r'\(SERVICE_([A-Z_]+),\s*\w+\)', services))
         self.assertEqual(set(declared), registered,
                          '服务常量与 handlers 注册不一致')
         self.assertEqual(set(declared.values()), doc,
@@ -606,7 +606,7 @@ class TestRepo(unittest.TestCase):
         self.assertIn('.mt-side .tab.setting{', css)
 
     def test_import_projects_interface(self):
-        init = (PKG / '__init__.py').read_text(encoding='utf-8')
+        init = (PKG / 'services.py').read_text(encoding='utf-8')
         self.assertIn('async def import_projects', init)
         self.assertIn('proj["history"] = histories', init)
         self.assertIn('isinstance(p.get("history"), list)', init)  # 全量 history 原样还原
@@ -842,6 +842,28 @@ class TestHolidayRollover(unittest.TestCase):
         self.assertIn('await self.async_warm_snapshots((now.year, now.year + 1))', ensure)
 
 
+class TestServiceSplit(unittest.TestCase):
+    def test_services_module_is_self_contained(self):
+        """服务拆分契约：__init__ 只 setup/调度，服务实现全在 services.py 且 import 齐全。"""
+        init = (PKG / '__init__.py').read_text(encoding='utf-8')
+        svc = (PKG / 'services.py').read_text(encoding='utf-8')
+        const = (PKG / 'const.py').read_text(encoding='utf-8')
+        # __init__ 不再定义服务 handler
+        self.assertNotIn('async def _async_register_services', init)
+        self.assertIn('from .services import async_register_services', init)
+        self.assertIn('async_register_services(hass, coordinator, notifier)', init)
+        # services.py 有全部 handler
+        self.assertIn('def async_register_services(', svc)
+        for name in ('snapshot', 'set_day', 'import_projects', 'set_settings',
+                     'export_all', 'log_service'):
+            self.assertIn('async def ' + name, svc)
+        # const 里所有服务常量都在 services.py import 且使用
+        declared = set(__import__('re').findall(r'^SERVICE_\w+(?=\s*=)', const, __import__('re').M))
+        used = set(__import__('re').findall(r'\b(SERVICE_\w+)\b', svc))
+        self.assertEqual(declared, used)
+        self.assertLess(len(init.splitlines()), 300, '__init__.py 应保持精简')
+
+
 class TestViewDomStructure(unittest.TestCase):
     def test_normal_view_wraps_items_and_history(self):
         """normalView 必须包住小项与历史区，否则切设置页时它们不会隐藏。"""
@@ -907,7 +929,7 @@ class TestReminderSettings(unittest.TestCase):
         self.assertIn('"time": "09:00"', store)
 
     def test_services_registered_and_declared(self):
-        init = (PKG / '__init__.py').read_text(encoding='utf-8')
+        init = (PKG / 'services.py').read_text(encoding='utf-8')
         yaml = (PKG / 'services.yaml').read_text(encoding='utf-8')
         const = (PKG / 'const.py').read_text(encoding='utf-8')
         self.assertIn('SERVICE_GET_SETTINGS = "get_settings"', const)
