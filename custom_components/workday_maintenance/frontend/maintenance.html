@@ -20,8 +20,12 @@
         <div class="hint">提醒通过魔法推送（magicpush）发出。先在 magicpush 里创建推送接口拿到 token，填到下面；再开启需要的提醒。</div>
 
         <div class="set-group"><b>魔法推送</b>
-          <div><label>服务地址</label><input id="setPushUrl" placeholder="https://push.example.com"></div>
+          <div><label>服务地址</label><input id="setPushUrl" placeholder="http://192.168.2.2:2818"></div>
           <div><label>接口 Token</label><input id="setPushToken" placeholder="推送接口 token" type="password"></div>
+          <div style="grid-column:1/-1">
+            <button class="ghost" id="setPushTest">发送测试推送</button>
+            <span class="hint" id="setPushTestResult" style="margin-left:8px"></span>
+          </div>
         </div>
 
         <div class="set-group"><b>纪念日提醒</b>
@@ -262,6 +266,20 @@
       $('setStatus').textContent = '';
     }).catch(function (e) { $('setStatus').textContent = '读取失败：' + e.message; });
   }
+  function testPushSettings() {
+    var url = $('setPushUrl').value.trim(), token = $('setPushToken').value.trim();
+    var out = $('setPushTestResult'), btn = $('setPushTest');
+    if (!url || !token) { out.textContent = '请先填服务地址和 Token'; out.style.color = 'var(--danger)'; return; }
+    out.textContent = '发送中…'; out.style.color = 'var(--muted)'; btn.disabled = true;
+    M.call('test_push', { url: url, token: token }, true).then(function (res) {
+      var r = (res && res.service_response) || res || {};
+      if (r.ok) { out.textContent = r.detail || '测试成功'; out.style.color = 'var(--ok)'; }
+      else { out.textContent = r.error || '测试失败'; out.style.color = 'var(--danger)'; }
+    }).catch(function (e) {
+      out.textContent = '调用失败：' + e.message; out.style.color = 'var(--danger)';
+    }).finally(function () { btn.disabled = false; });
+  }
+
   function saveSettings() {
     var days = String($('setAnnDays').value || '').split(',')
       .map(function (x) { return Number(String(x).trim()); })
@@ -663,6 +681,7 @@
     render();
   };
   $('setSave').onclick = saveSettings;
+  $('setPushTest').onclick = testPushSettings;
   $('setCancel').onclick = function () { showView('normal'); };
   $('setExport').onclick = exportCurrent;
   $('setImport').onclick = openImport;
