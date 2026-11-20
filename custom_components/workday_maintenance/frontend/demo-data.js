@@ -190,6 +190,7 @@
     var w = SNAP.workday, m = SNAP.maintenance, p, it;
     switch (service) {
       case 'get_settings': result = JSON.parse(JSON.stringify(DEMO_SETTINGS)); break;
+      case 'test_push': result = { ok: true, detail: '本地预览：测试推送成功（模拟）' }; break;
       case 'set_settings':
         ['magicpush','anniversary','maintenance'].forEach(function (sec) {
           if (data[sec] && typeof data[sec] === 'object')
