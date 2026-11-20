@@ -21,6 +21,7 @@ from .const import (
     SERVICE_ADD_ITEM, SERVICE_ADD_PROJECT, SERVICE_CLEAR_CUSTOM,
     SERVICE_DELETE_ITEM, SERVICE_DELETE_PROJECT, SERVICE_DELETE_RECORD,
     SERVICE_EXPORT, SERVICE_EXPORT_ALL, SERVICE_GET_SETTINGS, SERVICE_GET_SNAPSHOT,
+    SERVICE_TEST_PUSH,
     SERVICE_IMPORT_PROJECTS, SERVICE_LIST_PROJECTS, SERVICE_LOG_SERVICE,
     SERVICE_REFRESH, SERVICE_SET_ANNIVERSARIES, SERVICE_SET_BASELINE,
     SERVICE_SET_COUNTER, SERVICE_SET_CUSTOM, SERVICE_SET_DAY, SERVICE_SET_SETTINGS,
@@ -469,6 +470,13 @@ def async_register_services(hass: HomeAssistant, coordinator: MergedCoordinator,
     async def set_settings(call: ServiceCall) -> dict:
         return await notifier.save_settings(dict(call.data))
 
+    async def test_push(call: ServiceCall) -> dict:
+        """用调用方传来的 url/token 发一条测试消息，不依赖已保存设置。"""
+        return await notifier.test_push(
+            str(call.data.get("url") or "").strip(),
+            str(call.data.get("token") or "").strip(),
+        )
+
     async def sync_todos(_call: ServiceCall) -> dict:
         added = await coordinator.async_sync_due_todos(True)
         await coordinator.async_refresh()
@@ -490,6 +498,7 @@ def async_register_services(hass: HomeAssistant, coordinator: MergedCoordinator,
         (SERVICE_EXPORT, export), (SERVICE_EXPORT_ALL, export_all),
         (SERVICE_SYNC_TODOS, sync_todos),
         (SERVICE_GET_SETTINGS, get_settings), (SERVICE_SET_SETTINGS, set_settings),
+        (SERVICE_TEST_PUSH, test_push),
     )
     for name, handler in handlers:
         register(name, handler)
