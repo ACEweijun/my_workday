@@ -11,8 +11,8 @@
   ],
   "documentation": "https://github.com/ACEweijun/workday_maintenance",
   "integration_type": "service",
-  "iot_class": "cloud_polling",
+  "iot_class": "local_polling",
   "issue_tracker": "https://github.com/ACEweijun/workday_maintenance/issues",
   "requirements": [],
-  "version": "2.8.3"
+  "version": "2.9.0"
 }
