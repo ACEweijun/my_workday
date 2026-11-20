@@ -11,6 +11,7 @@ SETTINGS_VERSION = 1
 # 新增服务名
 SERVICE_GET_SETTINGS = "get_settings"
 SERVICE_SET_SETTINGS = "set_settings"
+SERVICE_TEST_PUSH = "test_push"
 
 PANEL_URL = "/workday_maintenance"
 PANEL_WORKDAY = "workday.html"
