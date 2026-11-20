@@ -311,3 +311,16 @@ set_settings:
       name: 维护提醒
       description: 对象：enabled、weekday（0=周一..6=周日）、time（HH:MM）
       example: '{enabled:true,weekday:6,time:09:00}'
+
+test_push:
+  name: "测试魔法推送"
+  description: "用传入的地址和 token 立即发一条测试消息，不写入设置。"
+  fields:
+    url:
+      name: "服务地址"
+      description: "magicpush 服务根地址，如 http://192.168.2.2:2818"
+      example: "http://192.168.2.2:2818"
+    token:
+      name: "接口 Token"
+      description: "magicpush 推送接口 token"
+      example: "abc123"
